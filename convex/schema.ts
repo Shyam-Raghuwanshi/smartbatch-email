@@ -109,17 +109,76 @@ export default defineSchema({
     email: v.string(),
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    company: v.optional(v.string()),
+    position: v.optional(v.string()),
     tags: v.array(v.string()),
+    customFields: v.optional(v.record(v.string(), v.any())),
     createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
     isActive: v.boolean(),
-    metadata: v.optional(v.object({
-      source: v.optional(v.string()),
-      lastEngagement: v.optional(v.number()),
+    source: v.optional(v.string()),
+    lastEngagement: v.optional(v.number()),
+    emailStats: v.optional(v.object({
+      totalSent: v.number(),
+      totalOpened: v.number(),
+      totalClicked: v.number(),
+      lastOpenedAt: v.optional(v.number()),
+      lastClickedAt: v.optional(v.number()),
     })),
   })
     .index("by_user", ["userId"])
     .index("by_email", ["email"])
-    .index("by_tags", ["tags"]),
+    .index("by_tags", ["tags"])
+    .index("by_company", ["company"])
+    .index("by_updated_at", ["updatedAt"])
+    .index("by_last_engagement", ["lastEngagement"]),
+
+  contactSegments: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    filters: v.object({
+      tags: v.optional(v.array(v.string())),
+      companies: v.optional(v.array(v.string())),
+      engagementRange: v.optional(v.object({
+        min: v.optional(v.number()),
+        max: v.optional(v.number()),
+      })),
+      customFieldFilters: v.optional(v.array(v.object({
+        field: v.string(),
+        operator: v.string(),
+        value: v.string(),
+      }))),
+    }),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    contactCount: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_name", ["name"]),
+
+  contactImports: defineTable({
+    userId: v.id("users"),
+    fileName: v.string(),
+    source: v.union(v.literal("csv"), v.literal("google_sheets"), v.literal("api")),
+    status: v.union(
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("partial")
+    ),
+    totalRecords: v.number(),
+    successfulImports: v.number(),
+    failedImports: v.number(),
+    duplicatesSkipped: v.number(),
+    errors: v.optional(v.array(v.string())),
+    createdAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"])
+    .index("by_created_at", ["createdAt"]),
 
   analytics: defineTable({
     campaignId: v.id("campaigns"),

@@ -342,7 +342,7 @@ export const getCategories = query({
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
 
-    const categories = [...new Set(templates.map(t => t.category))];
+    const categories = Array.from(new Set(templates.map(t => t.category)));
     return categories;
   },
 });

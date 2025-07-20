@@ -34,6 +34,7 @@ export const createContact = mutation({
       userId: user._id,
       isActive: args.isActive ?? true,
       createdAt: Date.now(),
+      updatedAt: Date.now(),
     });
     return contactId;
   },
@@ -245,7 +246,7 @@ export const addTagsToContact = mutation({
     }
 
     const existingTags = contact.tags || [];
-    const newTags = [...new Set([...existingTags, ...args.tags])];
+    const newTags = Array.from(new Set([...existingTags, ...args.tags]));
 
     await ctx.db.patch(args.id, { tags: newTags });
     return args.id;
@@ -317,6 +318,7 @@ export const bulkImportContacts = mutation({
         userId: user._id,
         isActive: true,
         createdAt: Date.now(),
+        updatedAt: Date.now(),
       });
       contactIds.push(contactId);
     }

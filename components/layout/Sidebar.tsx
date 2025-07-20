@@ -9,7 +9,8 @@ import {
   Users,
   BarChart3,
   Settings,
-  Menu
+  Menu,
+  Filter
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,13 +23,22 @@ export interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
+  children?: NavItem[];
 }
 
 const navigation: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
   { name: 'Campaigns', href: '/campaigns', icon: Mail, badge: '3' },
   { name: 'Templates', href: '/templates', icon: FileText },
-  { name: 'Contacts', href: '/contacts', icon: Users },
+  { 
+    name: 'Contacts', 
+    href: '/contacts', 
+    icon: Users,
+    children: [
+      { name: 'All Contacts', href: '/contacts', icon: Users },
+      { name: 'Segments', href: '/contacts/segments', icon: Filter },
+    ]
+  },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
@@ -87,6 +97,36 @@ function DesktopSidebar({ className }: { className?: string }) {
                           </Badge>
                         )}
                       </Link>
+                      
+                      {/* Submenu */}
+                      {item.children && isActive && (
+                        <ul className="ml-6 mt-1 space-y-1">
+                          {item.children.map((childItem) => {
+                            const isChildActive = pathname === childItem.href;
+                            return (
+                              <li key={childItem.name}>
+                                <Link
+                                  href={childItem.href}
+                                  className={cn(
+                                    "group flex gap-x-3 rounded-md p-2 text-sm leading-6",
+                                    isChildActive
+                                      ? "bg-blue-50 text-blue-700 font-medium"
+                                      : "text-gray-600 hover:text-blue-600 hover:bg-gray-50"
+                                  )}
+                                >
+                                  <childItem.icon 
+                                    className={cn(
+                                      "h-5 w-5 shrink-0",
+                                      isChildActive ? "text-blue-600" : "text-gray-400 group-hover:text-blue-600"
+                                    )}
+                                  />
+                                  {childItem.name}
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
                     </li>
                   );
                 })}
@@ -169,6 +209,36 @@ function MobileSidebar() {
                             </Badge>
                           )}
                         </Link>
+                        
+                        {/* Submenu for mobile */}
+                        {item.children && isActive && (
+                          <ul className="ml-6 mt-1 space-y-1">
+                            {item.children.map((childItem) => {
+                              const isChildActive = pathname === childItem.href;
+                              return (
+                                <li key={childItem.name}>
+                                  <Link
+                                    href={childItem.href}
+                                    className={cn(
+                                      "group flex gap-x-3 rounded-md p-2 text-sm leading-6",
+                                      isChildActive
+                                        ? "bg-blue-50 text-blue-700 font-medium"
+                                        : "text-gray-600 hover:text-blue-600 hover:bg-gray-50"
+                                    )}
+                                  >
+                                    <childItem.icon 
+                                      className={cn(
+                                        "h-5 w-5 shrink-0",
+                                        isChildActive ? "text-blue-600" : "text-gray-400 group-hover:text-blue-600"
+                                      )}
+                                    />
+                                    {childItem.name}
+                                  </Link>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
                       </li>
                     );
                   })}
