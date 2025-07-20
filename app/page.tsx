@@ -1,103 +1,126 @@
-import Image from "next/image";
+"use client";
+
+import { SignInButton, SignUpButton, useUser } from '@clerk/nextjs'
+import Link from 'next/link'
+import { useEffect } from 'react'
+import { redirect } from 'next/navigation'
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const { isSignedIn, user } = useUser()
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Redirect to dashboard if user is already signed in
+  useEffect(() => {
+    if (isSignedIn) {
+      redirect('/dashboard')
+    }
+  }, [isSignedIn])
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Header */}
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <h1 className="text-2xl font-bold text-blue-600">SmartBatch</h1>
+            </div>
+            <div className="flex space-x-4">
+              <SignInButton mode="modal">
+                <button className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+                  Sign In
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                  Get Started
+                </button>
+              </SignUpButton>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Hero Section */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div className="text-center">
+          <h1 className="text-4xl font-extrabold text-gray-900 sm:text-5xl md:text-6xl">
+            <span className="block">Professional Email</span>
+            <span className="block text-blue-600">Marketing Platform</span>
+          </h1>
+          <p className="mt-6 max-w-2xl mx-auto text-xl text-gray-600">
+            Send personalized email campaigns, track performance, and grow your business 
+            with advanced analytics and automation tools.
+          </p>
+          <div className="mt-10 flex justify-center space-x-6">
+            <SignUpButton mode="modal">
+              <button className="bg-blue-600 hover:bg-blue-700 text-white text-lg font-medium py-3 px-8 rounded-lg shadow-lg transition-colors">
+                Start Free Trial
+              </button>
+            </SignUpButton>
+            <SignInButton mode="modal">
+              <button className="bg-white hover:bg-gray-50 text-blue-600 text-lg font-medium py-3 px-8 rounded-lg border-2 border-blue-600 transition-colors">
+                Sign In
+              </button>
+            </SignInButton>
+          </div>
+        </div>
+
+        {/* Features */}
+        <div className="mt-24 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="bg-white rounded-lg p-6 shadow-md">
+            <div className="text-3xl mb-4">📧</div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Campaign Management</h3>
+            <p className="text-gray-600">Create, schedule, and manage email campaigns with our intuitive interface.</p>
+          </div>
+          <div className="bg-white rounded-lg p-6 shadow-md">
+            <div className="text-3xl mb-4">👥</div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Contact Management</h3>
+            <p className="text-gray-600">Organize your contacts with tags, segments, and smart filtering.</p>
+          </div>
+          <div className="bg-white rounded-lg p-6 shadow-md">
+            <div className="text-3xl mb-4">📊</div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Advanced Analytics</h3>
+            <p className="text-gray-600">Track opens, clicks, and conversions with detailed reporting.</p>
+          </div>
+          <div className="bg-white rounded-lg p-6 shadow-md">
+            <div className="text-3xl mb-4">📝</div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Template Library</h3>
+            <p className="text-gray-600">Use professional templates or create your own custom designs.</p>
+          </div>
+          <div className="bg-white rounded-lg p-6 shadow-md">
+            <div className="text-3xl mb-4">⚡</div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Automation</h3>
+            <p className="text-gray-600">Set up automated email sequences and drip campaigns.</p>
+          </div>
+          <div className="bg-white rounded-lg p-6 shadow-md">
+            <div className="text-3xl mb-4">🎯</div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Personalization</h3>
+            <p className="text-gray-600">Personalize emails with dynamic content and smart targeting.</p>
+          </div>
+        </div>
+
+        {/* CTA Section */}
+        <div className="mt-24 bg-blue-600 rounded-lg px-8 py-12 text-center">
+          <h2 className="text-3xl font-bold text-white mb-4">
+            Ready to grow your business?
+          </h2>
+          <p className="text-xl text-blue-100 mb-8">
+            Join thousands of businesses using SmartBatch to reach their customers.
+          </p>
+          <SignUpButton mode="modal">
+            <button className="bg-white hover:bg-gray-100 text-blue-600 text-lg font-medium py-3 px-8 rounded-lg transition-colors">
+              Get Started for Free
+            </button>
+          </SignUpButton>
         </div>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+
+      {/* Footer */}
+      <footer className="bg-gray-800 text-white py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p>&copy; 2025 SmartBatch Email. All rights reserved.</p>
+        </div>
       </footer>
     </div>
-  );
+  )
 }
