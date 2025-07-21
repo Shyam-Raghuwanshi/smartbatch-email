@@ -470,6 +470,16 @@ function CampaignsContent({
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {/* Monitoring Dashboard Link */}
+          <Button 
+            variant="outline" 
+            onClick={() => window.open('/campaigns/monitoring', '_blank')}
+            className="flex items-center gap-2"
+          >
+            <BarChart3 className="h-4 w-4" />
+            Monitoring Dashboard
+          </Button>
+          
           {/* Seed Sample Data Button - only show if no campaigns exist */}
           {filteredCampaigns.length === 0 && (
             <Button 
@@ -500,29 +510,6 @@ function CampaignsContent({
         </Dialog>
         </div>
       </div>
-
-      {/* Debug Section - Authentication Testing */}
-      <Card className="border-yellow-200 bg-yellow-50">
-        <CardHeader>
-          <CardTitle className="text-sm">🔍 Authentication Debug</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div>
-              <strong>Public Test:</strong>
-              <pre className="mt-1 p-2 bg-white rounded text-xs overflow-auto">
-                {JSON.stringify(testPublic, null, 2)}
-              </pre>
-            </div>
-            <div>
-              <strong>Auth Test:</strong>
-              <pre className="mt-1 p-2 bg-white rounded text-xs overflow-auto">
-                {JSON.stringify(testAuth, null, 2)}
-              </pre>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -827,6 +814,13 @@ function CampaignsContent({
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(`/campaigns/monitoring?campaign=${campaign._id}`, '_blank');
+                          }}>
+                            <BarChart3 className="h-4 w-4 mr-2" />
+                            Monitor
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={(e) => {
                             e.stopPropagation();
                             handleDuplicateCampaign(campaign);

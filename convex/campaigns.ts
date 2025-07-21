@@ -24,6 +24,50 @@ export const createCampaign = mutation({
       trackOpens: v.boolean(),
       trackClicks: v.boolean(),
     }),
+    scheduleSettings: v.optional(v.object({
+      type: v.union(
+        v.literal("immediate"),
+        v.literal("scheduled"),
+        v.literal("recurring"),
+        v.literal("optimal")
+      ),
+      timezone: v.optional(v.string()),
+      sendRate: v.optional(v.object({
+        emailsPerHour: v.number(),
+        emailsPerDay: v.number(),
+        respectTimeZones: v.boolean(),
+      })),
+      recurring: v.optional(v.object({
+        pattern: v.union(
+          v.literal("daily"),
+          v.literal("weekly"), 
+          v.literal("monthly")
+        ),
+        interval: v.number(),
+        daysOfWeek: v.optional(v.array(v.number())),
+        dayOfMonth: v.optional(v.number()),
+        endDate: v.optional(v.number()),
+        maxOccurrences: v.optional(v.number()),
+      })),
+      optimal: v.optional(v.object({
+        useEngagementData: v.boolean(),
+        useTimeZones: v.boolean(),
+        preferredTimeSlots: v.array(v.object({
+          startHour: v.number(),
+          endHour: v.number(),
+        })),
+        avoidWeekends: v.boolean(),
+        minHoursBetweenSends: v.number(),
+      })),
+      ispThrottling: v.optional(v.object({
+        enabled: v.boolean(),
+        rules: v.array(v.object({
+          ispDomain: v.string(),
+          maxPerHour: v.number(),
+          maxPerDay: v.number(),
+        })),
+      })),
+    })),
   },
   handler: async (ctx, args) => {
     const campaignId = await ctx.db.insert("campaigns", {
@@ -109,6 +153,50 @@ export const updateCampaign = mutation({
       sendDelay: v.optional(v.number()),
       trackOpens: v.boolean(),
       trackClicks: v.boolean(),
+    })),
+    scheduleSettings: v.optional(v.object({
+      type: v.union(
+        v.literal("immediate"),
+        v.literal("scheduled"),
+        v.literal("recurring"),
+        v.literal("optimal")
+      ),
+      timezone: v.optional(v.string()),
+      sendRate: v.optional(v.object({
+        emailsPerHour: v.number(),
+        emailsPerDay: v.number(),
+        respectTimeZones: v.boolean(),
+      })),
+      recurring: v.optional(v.object({
+        pattern: v.union(
+          v.literal("daily"),
+          v.literal("weekly"), 
+          v.literal("monthly")
+        ),
+        interval: v.number(),
+        daysOfWeek: v.optional(v.array(v.number())),
+        dayOfMonth: v.optional(v.number()),
+        endDate: v.optional(v.number()),
+        maxOccurrences: v.optional(v.number()),
+      })),
+      optimal: v.optional(v.object({
+        useEngagementData: v.boolean(),
+        useTimeZones: v.boolean(),
+        preferredTimeSlots: v.array(v.object({
+          startHour: v.number(),
+          endHour: v.number(),
+        })),
+        avoidWeekends: v.boolean(),
+        minHoursBetweenSends: v.number(),
+      })),
+      ispThrottling: v.optional(v.object({
+        enabled: v.boolean(),
+        rules: v.array(v.object({
+          ispDomain: v.string(),
+          maxPerHour: v.number(),
+          maxPerDay: v.number(),
+        })),
+      })),
     })),
   },
   handler: async (ctx, args) => {
@@ -295,5 +383,148 @@ export const getCampaignStats = query({
       clickRate: stats.delivered > 0 ? (stats.clicked / stats.delivered * 100) : 0,
       bounceRate: stats.sent > 0 ? (stats.bounced / stats.sent * 100) : 0,
     };
+  },
+});
+
+// Campaign control functions
+export const pauseCampaign = mutation({
+  args: { campaignId: v.id("campaigns") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    
+    const campaign = await ctx.db.get(args.campaignId);
+    if (!campaign) {
+      throw new Error("Campaign not found");
+    }
+    
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    
+    if (!user || campaign.userId !== user._id) {
+      throw new Error("Unauthorized");
+    }
+    
+    if (campaign.status !== "sending") {
+      throw new Error("Campaign is not currently sending");
+    }
+    
+    // Update campaign status
+    await ctx.db.patch(args.campaignId, { status: "paused" });
+    
+    // Cancel queued emails
+    const queuedEmails = await ctx.db
+      .query("emailQueue")
+      .withIndex("by_campaign", (q) => q.eq("campaignId", args.campaignId))
+      .filter((q) => q.eq(q.field("status"), "queued"))
+      .collect();
+    
+    for (const email of queuedEmails) {
+      await ctx.db.patch(email._id, { 
+        status: "cancelled",
+        updatedAt: Date.now()
+      });
+    }
+    
+    return { success: true, pausedEmails: queuedEmails.length };
+  },
+});
+
+export const resumeCampaign = mutation({
+  args: { campaignId: v.id("campaigns") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    
+    const campaign = await ctx.db.get(args.campaignId);
+    if (!campaign) {
+      throw new Error("Campaign not found");
+    }
+    
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    
+    if (!user || campaign.userId !== user._id) {
+      throw new Error("Unauthorized");
+    }
+    
+    if (campaign.status !== "paused") {
+      throw new Error("Campaign is not paused");
+    }
+    
+    // Update campaign status
+    await ctx.db.patch(args.campaignId, { status: "sending" });
+    
+    // Requeue cancelled emails
+    const cancelledEmails = await ctx.db
+      .query("emailQueue")
+      .withIndex("by_campaign", (q) => q.eq("campaignId", args.campaignId))
+      .filter((q) => q.eq(q.field("status"), "cancelled"))
+      .collect();
+    
+    for (const email of cancelledEmails) {
+      await ctx.db.patch(email._id, { 
+        status: "queued",
+        updatedAt: Date.now()
+      });
+    }
+    
+    return { success: true, resumedEmails: cancelledEmails.length };
+  },
+});
+
+export const emergencyStopCampaign = mutation({
+  args: { campaignId: v.id("campaigns") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    
+    const campaign = await ctx.db.get(args.campaignId);
+    if (!campaign) {
+      throw new Error("Campaign not found");
+    }
+    
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    
+    if (!user || campaign.userId !== user._id) {
+      throw new Error("Unauthorized");
+    }
+    
+    // Update campaign status
+    await ctx.db.patch(args.campaignId, { status: "cancelled" });
+    
+    // Cancel all queued and processing emails
+    const activeEmails = await ctx.db
+      .query("emailQueue")
+      .withIndex("by_campaign", (q) => q.eq("campaignId", args.campaignId))
+      .filter((q) => 
+        q.or(
+          q.eq(q.field("status"), "queued"),
+          q.eq(q.field("status"), "processing")
+        )
+      )
+      .collect();
+    
+    for (const email of activeEmails) {
+      await ctx.db.patch(email._id, { 
+        status: "cancelled",
+        updatedAt: Date.now()
+      });
+    }
+    
+    return { success: true, stoppedEmails: activeEmails.length };
   },
 });

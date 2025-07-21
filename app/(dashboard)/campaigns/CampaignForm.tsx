@@ -17,18 +17,16 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { 
   Calendar,
-  Clock,
   Users,
   Mail,
-  Settings,
   AlertCircle,
   CheckCircle2,
   Plus,
   X,
-  Send,
   Timer,
   Eye
 } from 'lucide-react';
+import { SchedulingInterface } from '@/components/campaigns/SchedulingInterface';
 
 interface CampaignFormProps {
   campaignId?: Id<"campaigns">;
@@ -123,6 +121,21 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
         scheduledAt: formData.scheduleType === 'scheduled' && formData.scheduledAt 
           ? formData.scheduledAt.getTime() 
           : undefined,
+        scheduleSettings: {
+          type: formData.scheduleType,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          sendRate: {
+            emailsPerHour: 60, // Default rate
+            emailsPerDay: 1000,
+            respectTimeZones: true,
+          },
+          ...(formData.scheduleType === 'scheduled' && formData.scheduledAt && {
+            scheduledTime: formData.scheduledAt.getTime(),
+          }),
+          ...(formData.scheduleType === 'recurring' && formData.recurringPattern && {
+            recurringPattern: formData.recurringPattern,
+          }),
+        },
         settings: {
           subject: formData.subject,
           templateId: formData.templateId,
@@ -474,125 +487,96 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
         </TabsContent>
 
         <TabsContent value="schedule" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Scheduling & Rate Limiting
-              </CardTitle>
-              <CardDescription>
-                Configure when and how your campaign should be sent
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Send Option</Label>
-                <Select value={formData.scheduleType} onValueChange={(value: ScheduleType) => setFormData(prev => ({ ...prev, scheduleType: value }))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="immediate">Send Immediately</SelectItem>
-                    <SelectItem value="scheduled">Schedule for Later</SelectItem>
-                    <SelectItem value="recurring">Recurring Campaign</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {formData.scheduleType === 'scheduled' && (
+          {/* Advanced Scheduling Interface */}
+          {campaignId ? (
+            <SchedulingInterface 
+              campaignId={campaignId} 
+              onSave={() => {
+                // Refresh campaign data
+                window.location.reload();
+              }}
+            />
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Basic Scheduling
+                </CardTitle>
+                <CardDescription>
+                  Save your campaign first to access advanced scheduling features
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="scheduled-time">Scheduled Date & Time</Label>
-                  <Input
-                    id="scheduled-time"
-                    type="datetime-local"
-                    value={formData.scheduledAt ? formData.scheduledAt.toISOString().slice(0, 16) : ''}
-                    onChange={(e) => setFormData(prev => ({ 
-                      ...prev, 
-                      scheduledAt: e.target.value ? new Date(e.target.value) : undefined 
-                    }))}
-                    min={new Date().toISOString().slice(0, 16)}
-                  />
+                  <Label>Send Option</Label>
+                  <Select value={formData.scheduleType} onValueChange={(value: ScheduleType) => setFormData(prev => ({ ...prev, scheduleType: value }))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="immediate">Send Immediately</SelectItem>
+                      <SelectItem value="scheduled">Schedule for Later</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
 
-              {formData.scheduleType === 'recurring' && (
-                <div className="space-y-3">
+                {formData.scheduleType === 'scheduled' && (
                   <div>
-                    <Label>Recurrence Pattern</Label>
-                    <Select value={formData.recurringPattern?.type || 'weekly'} onValueChange={(value: 'daily' | 'weekly' | 'monthly') => setFormData(prev => ({ 
-                      ...prev, 
-                      recurringPattern: { type: value, interval: prev.recurringPattern?.interval || 1 }
-                    }))}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="scheduled-time">Scheduled Date & Time</Label>
+                    <Input
+                      id="scheduled-time"
+                      type="datetime-local"
+                      value={formData.scheduledAt ? formData.scheduledAt.toISOString().slice(0, 16) : ''}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        scheduledAt: e.target.value ? new Date(e.target.value) : undefined 
+                      }))}
+                      min={new Date().toISOString().slice(0, 16)}
+                    />
                   </div>
-                  <div>
-                    <Label htmlFor="interval">Repeat Every</Label>
-                    <div className="flex gap-2 items-center">
-                      <Input
-                        id="interval"
-                        type="number"
-                        min={1}
-                        max={30}
-                        value={formData.recurringPattern?.interval || 1}
-                        onChange={(e) => setFormData(prev => ({ 
-                          ...prev, 
-                          recurringPattern: { 
-                            type: prev.recurringPattern?.type || 'weekly', 
-                            interval: parseInt(e.target.value) || 1 
-                          }
-                        }))}
-                        className="w-20"
-                      />
-                      <span className="text-sm text-gray-600">
-                        {formData.recurringPattern?.type || 'week'}(s)
-                      </span>
-                    </div>
+                )}
+
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Advanced features like recurring campaigns, optimal timing, ISP throttling, and timezone optimization will be available after saving your campaign.
+                  </AlertDescription>
+                </Alert>
+
+                <div>
+                  <Label htmlFor="send-delay">Rate Limiting (seconds between emails)</Label>
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      id="send-delay"
+                      type="number"
+                      min={1}
+                      max={300}
+                      value={formData.sendDelay || 5}
+                      onChange={(e) => setFormData(prev => ({ ...prev, sendDelay: parseInt(e.target.value) || 5 }))}
+                      className="w-24"
+                    />
+                    <span className="text-sm text-gray-600">seconds</span>
                   </div>
-                </div>
-              )}
-
-              <Separator />
-
-              <div>
-                <Label htmlFor="send-delay">Rate Limiting (seconds between emails)</Label>
-                <div className="flex gap-2 items-center">
-                  <Input
-                    id="send-delay"
-                    type="number"
-                    min={1}
-                    max={300}
-                    value={formData.sendDelay || 5}
-                    onChange={(e) => setFormData(prev => ({ ...prev, sendDelay: parseInt(e.target.value) || 5 }))}
-                    className="w-24"
-                  />
-                  <span className="text-sm text-gray-600">seconds</span>
-                </div>
-                <p className="text-sm text-gray-500 mt-1">
-                  Delay between sending emails to avoid being marked as spam. Recommended: 5-10 seconds.
-                </p>
-              </div>
-
-              {recipientCount > 0 && formData.sendDelay && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <div className="flex items-center gap-2 text-blue-800">
-                    <Timer className="h-4 w-4" />
-                    <span className="font-medium">Estimated Send Time</span>
-                  </div>
-                  <p className="text-sm text-blue-700 mt-1">
-                    Approximately {Math.ceil((recipientCount * formData.sendDelay) / 60)} minutes to send to all {recipientCount} recipients
+                  <p className="text-sm text-gray-500 mt-1">
+                    Delay between sending emails to avoid being marked as spam. Recommended: 5-10 seconds.
                   </p>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+
+                {recipientCount > 0 && formData.sendDelay && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-blue-800">
+                      <Timer className="h-4 w-4" />
+                      <span className="font-medium">Estimated Send Time</span>
+                    </div>
+                    <p className="text-sm text-blue-700 mt-1">
+                      Approximately {Math.ceil((recipientCount * formData.sendDelay) / 60)} minutes to send to all {recipientCount} recipients
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="preview" className="space-y-4">

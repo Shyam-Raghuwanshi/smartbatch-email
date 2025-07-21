@@ -10,7 +10,8 @@ import {
   BarChart3,
   Settings,
   Menu,
-  Filter
+  Filter,
+  Calendar
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,7 +29,17 @@ export interface NavItem {
 
 const navigation: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Campaigns', href: '/campaigns', icon: Mail, badge: '3' },
+  { 
+    name: 'Campaigns', 
+    href: '/campaigns', 
+    icon: Mail, 
+    badge: '3',
+    children: [
+      { name: 'All Campaigns', href: '/campaigns', icon: Mail },
+      { name: 'Schedule Management', href: '/campaigns/schedule', icon: Calendar },
+      { name: 'Test Scheduling', href: '/campaigns/test-scheduling', icon: Settings },
+    ]
+  },
   { name: 'Templates', href: '/templates', icon: FileText },
   { 
     name: 'Contacts', 
