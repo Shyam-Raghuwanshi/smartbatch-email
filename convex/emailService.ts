@@ -2,6 +2,7 @@ import { internal } from "./_generated/api";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { components } from "./_generated/api";
+import { Id } from "./_generated/dataModel";
 
 // Import and export the resend component
 export const { resend } = components;
@@ -108,6 +109,20 @@ export const handleEmailEvent = internalMutation({
         lastEngagement: Date.now(),
         updatedAt: Date.now(),
       });
+    }
+
+    // Handle A/B test tracking if this is an A/B test email
+    if (emailQueue.metadata?.abTestId && emailQueue.metadata?.variantId) {
+      const trackingEvent = args.event.type as "delivered" | "opened" | "clicked" | "bounced" | "complained";
+      
+      // Only track events that are relevant to A/B testing
+      if (["delivered", "opened", "clicked", "bounced", "complained"].includes(trackingEvent)) {
+        await ctx.runMutation(internal.emailService.trackABTestEvent, {
+          emailQueueId: emailQueue._id,
+          event: trackingEvent,
+          metadata: args.event.data,
+        });
+      }
     }
   },
 });
@@ -452,6 +467,179 @@ export const sendBatchEmails = mutation({
 });
 
 /**
+ * Send A/B Test Campaign with automatic variant distribution
+ */
+export const sendABTestCampaign = mutation({
+  args: {
+    testId: v.id("abTests"),
+    batchSize: v.optional(v.number()),
+    delayBetweenBatches: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Get A/B test details
+    const test = await ctx.db.get(args.testId);
+    if (!test || test.userId !== user._id) {
+      throw new Error("A/B test not found or unauthorized");
+    }
+
+    if (test.status !== "active") {
+      throw new Error("A/B test is not active");
+    }
+
+    // Get test variants
+    const variants = await ctx.db
+      .query("abTestVariants")
+      .withIndex("by_test", (q) => q.eq("testId", args.testId))
+      .collect();
+
+    if (variants.length === 0) {
+      throw new Error("No variants found for A/B test");
+    }
+
+    const batchSize = args.batchSize || 10;
+    const delayBetweenBatches = args.delayBetweenBatches || 60000;
+    const emailQueueIds: Id<"emailQueue">[] = [];
+
+    // Send emails for each variant
+    for (const variant of variants) {
+      const recipients = variant.assignedRecipients;
+
+      for (const recipient of recipients) {
+        // Check unsubscribe status
+        const unsubscribe = await ctx.db
+          .query("unsubscribes")
+          .filter((q) => q.eq(q.field("email"), recipient))
+          .filter((q) => q.eq(q.field("userId"), user._id))
+          .first();
+
+        if (unsubscribe) {
+          continue; // Skip unsubscribed emails
+        }
+
+        // Get contact for personalization
+        const contact = await ctx.db
+          .query("contacts")
+          .filter((q) => q.eq(q.field("email"), recipient))
+          .first();
+
+        // Process variant configuration
+        let { subject, customContent, templateId, fromName, fromEmail } = variant.campaignConfig;
+        let htmlContent = customContent || "";
+        let textContent = "";
+
+        // Apply template if specified
+        if (templateId) {
+          const template = await ctx.db.get(templateId);
+          if (template) {
+            const variables = {
+              firstName: contact?.firstName || "",
+              lastName: contact?.lastName || "",
+              email: recipient,
+              fullName: contact?.firstName && contact?.lastName 
+                ? `${contact.firstName} ${contact.lastName}`
+                : contact?.firstName || recipient,
+              company: contact?.company || "",
+            };
+
+            htmlContent = template.htmlContent || template.content || "";
+            textContent = template.content || "";
+
+            // Replace variables in content
+            for (const [key, value] of Object.entries(variables)) {
+              const regex = new RegExp(`{${key}}`, 'g');
+              htmlContent = htmlContent.replace(regex, String(value));
+              textContent = textContent.replace(regex, String(value));
+              subject = subject.replace(regex, String(value));
+            }
+          }
+        }
+
+        // Create email queue entry
+        const emailQueueId = await ctx.db.insert("emailQueue", {
+          userId: user._id,
+          campaignId: variant.campaignId,
+          recipient,
+          subject,
+          htmlContent,
+          textContent,
+          fromEmail: fromEmail || user.email,
+          fromName: fromName || user.name,
+          status: "queued",
+          priority: 5,
+          attemptCount: 0,
+          maxAttempts: 3,
+          scheduledAt: Date.now(),
+          metadata: {
+            abTestId: args.testId,
+            variantId: variant._id,
+            trackOpens: true,
+            trackClicks: true,
+          },
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+
+        emailQueueIds.push(emailQueueId);
+
+        // Update A/B test segment with sent event
+        const segment = await ctx.db
+          .query("abTestSegments")
+          .withIndex("by_recipient", (q) => q.eq("recipientEmail", recipient))
+          .filter((q) => q.eq(q.field("testId"), args.testId))
+          .first();
+
+        if (segment) {
+          const events = segment.events || [];
+          events.push({
+            type: "sent",
+            timestamp: Date.now(),
+            metadata: { emailQueueId },
+          });
+          await ctx.db.patch(segment._id, { events });
+        }
+      }
+    }
+
+    // Create batch for processing
+    const batchId = await ctx.db.insert("emailBatches", {
+      userId: user._id,
+      name: `A/B Test: ${test.name}`,
+      status: "pending",
+      totalEmails: emailQueueIds.length,
+      processedEmails: 0,
+      successfulEmails: 0,
+      failedEmails: 0,
+      batchSize,
+      delayBetweenBatches,
+      emailQueueIds,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    // Schedule batch processing
+    await ctx.scheduler.runAfter(0, internal.emailService.processBatch, {
+      batchId,
+    });
+
+    return { batchId, totalEmails: emailQueueIds.length };
+  },
+});
+
+/**
  * Process a single email from the queue
  */
 export const processEmailQueue = internalMutation({
@@ -726,6 +914,58 @@ export const processPriorityQueue = internalMutation({
     }
 
     return priorityEmails.length;
+  },
+});
+
+// A/B Testing Integration Functions
+
+/**
+ * Track A/B test email events
+ */
+export const trackABTestEvent = internalMutation({
+  args: {
+    emailQueueId: v.id("emailQueue"),
+    event: v.union(
+      v.literal("delivered"),
+      v.literal("opened"),
+      v.literal("clicked"),
+      v.literal("bounced"),
+      v.literal("complained")
+    ),
+    metadata: v.optional(v.record(v.string(), v.any())),
+  },
+  handler: async (ctx, args) => {
+    const emailQueue = await ctx.db.get(args.emailQueueId);
+    if (!emailQueue || !emailQueue.metadata?.abTestId) {
+      return; // Not an A/B test email
+    }
+
+    const testId = emailQueue.metadata.abTestId as string;
+    const variantId = emailQueue.metadata.variantId as string;
+
+    // Update A/B test results
+    await ctx.runMutation(internal.abTesting.updateABTestResults, {
+      recipientEmail: emailQueue.recipient,
+      event: args.event,
+      metadata: args.metadata,
+    });
+
+    // Update segment events
+    const segment = await ctx.db
+      .query("abTestSegments")
+      .withIndex("by_recipient", (q) => q.eq("recipientEmail", emailQueue.recipient))
+      .filter((q) => q.eq(q.field("testId"), testId))
+      .first();
+
+    if (segment) {
+      const events = segment.events || [];
+      events.push({
+        type: args.event,
+        timestamp: Date.now(),
+        metadata: args.metadata || {},
+      });
+      await ctx.db.patch(segment._id, { events });
+    }
   },
 });
 
