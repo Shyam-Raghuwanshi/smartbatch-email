@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -28,7 +28,7 @@ import { AlertingSystem } from '@/components/campaigns/AlertingSystem';
 import { PerformanceCharts } from '@/components/campaigns/PerformanceCharts';
 import { toast } from "sonner";
 
-export default function CampaignMonitoringPage() {
+function CampaignMonitoring() {
   const searchParams = useSearchParams();
   const campaignIdParam = searchParams.get('campaign');
   const campaignId = campaignIdParam as Id<"campaigns"> | undefined;
@@ -51,11 +51,11 @@ export default function CampaignMonitoringPage() {
   const emergencyStopCampaign = useMutation(api.campaigns.emergencyStopCampaign);
   
   // Get active campaigns (sending or scheduled)
-  const activeCampaigns = campaigns?.filter(c => 
+  const activeCampaigns = campaigns?.filter((c: any) => 
     c.status === 'sending' || c.status === 'scheduled' || c.status === 'paused'
   ) || [];
   
-  const selectedCampaign = campaignId ? campaigns?.find(c => c._id === campaignId) : null;
+  const selectedCampaign = campaignId ? campaigns?.find((c: any) => c._id === campaignId) : null;
   
   const handlePauseCampaign = async () => {
     if (!campaignId) return;
@@ -127,7 +127,7 @@ export default function CampaignMonitoringPage() {
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-green-600">
-              {activeCampaigns.filter(c => c.status === 'sending').length}
+              {activeCampaigns.filter((c: any) => c.status === 'sending').length}
             </div>
             <div className="text-xs text-gray-500">Sending</div>
           </div>
@@ -151,7 +151,7 @@ export default function CampaignMonitoringPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {alerts.slice(0, 3).map((alert, index) => (
+              {alerts.slice(0, 3).map((alert: any, index: number) => (
                 <div key={index} className="flex items-center gap-2 text-sm">
                   <Badge variant="destructive">{alert.type}</Badge>
                   <span>{alert.message}</span>
@@ -181,7 +181,7 @@ export default function CampaignMonitoringPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {activeCampaigns.map((campaign) => (
+              {activeCampaigns.map((campaign: any) => (
                 <Button
                   key={campaign._id}
                   variant="outline"
@@ -336,7 +336,7 @@ export default function CampaignMonitoringPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {activeCampaigns.slice(0, 6).map((campaign) => (
+              {activeCampaigns.slice(0, 6).map((campaign:any) => (
                 <div key={campaign._id} className="border rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-medium text-gray-900 truncate">{campaign.name}</h3>
@@ -394,3 +394,13 @@ export default function CampaignMonitoringPage() {
     </div>
   );
 }
+
+function MonitoringWrapper() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CampaignMonitoring />
+    </Suspense>
+  );
+}
+
+export default MonitoringWrapper;

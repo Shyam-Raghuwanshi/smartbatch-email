@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -59,7 +59,7 @@ const COMMON_VARIABLES = [
   'supportEmail'
 ];
 
-export default function TemplateEditorPage() {
+function TemplateEditor() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const templateId = searchParams.get('id') as Id<"templates"> | null;
@@ -699,3 +699,13 @@ export default function TemplateEditorPage() {
     </div>
   );
 }
+
+function TemplateEditorWrapper() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <TemplateEditor />
+    </Suspense>
+  );
+}
+
+export default TemplateEditorWrapper;

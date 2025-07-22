@@ -62,7 +62,7 @@ const ABTestDashboard: React.FC = () => {
   const filteredTests = React.useMemo(() => {
     if (!abTests) return [];
     
-    return abTests.filter(test => {
+    return abTests.filter((test:any) => {
       const matchesSearch = test.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            (test.description?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
       const matchesStatus = statusFilter === 'all' || test.status === statusFilter;
@@ -308,7 +308,7 @@ const ABTestDashboard: React.FC = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredTests.map((test) => (
+                    {filteredTests.map((test:any) => (
                       <TableRow key={test._id}>
                         <TableCell>
                           <div>
@@ -428,7 +428,7 @@ const ABTestDashboard: React.FC = () => {
 
         <TabsContent value="active" className="space-y-6">
           <div className="grid gap-6">
-            {abTests?.filter(test => test.status === 'active').map(test => (
+            {abTests?.filter((test:any) => test.status === 'active').map((test:any) => (
               <Card key={test._id}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -492,7 +492,7 @@ const ABTestDashboard: React.FC = () => {
               </Card>
             ))}
             
-            {(!abTests || abTests.filter(test => test.status === 'active').length === 0) && (
+            {(!abTests || abTests.filter((test:any) => test.status === 'active').length === 0) && (
               <Card>
                 <CardContent className="p-12 text-center">
                   <Play className="h-12 w-12 mx-auto text-gray-400 mb-4" />

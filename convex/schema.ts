@@ -671,4 +671,1401 @@ export default defineSchema({
     .index("by_type", ["insightType"])
     .index("by_severity", ["severity"])
     .index("by_created_at", ["createdAt"]),
+
+  // External Integrations System
+  integrations: defineTable({
+    userId: v.id("users"),
+    type: v.union(
+      v.literal("google_sheets"),
+      v.literal("zapier"),
+      v.literal("webhook"),
+      v.literal("salesforce"),
+      v.literal("hubspot"),
+      v.literal("mailchimp"),
+      v.literal("api_key"),
+      v.literal("custom")
+    ),
+    name: v.string(),
+    description: v.optional(v.string()),
+    status: v.union(
+      v.literal("connected"),
+      v.literal("disconnected"),
+      v.literal("error"),
+      v.literal("pending"),
+      v.literal("configuring")
+    ),
+    configuration: v.object({
+      // OAuth credentials (encrypted)
+      accessToken: v.optional(v.string()),
+      refreshToken: v.optional(v.string()),
+      expiresAt: v.optional(v.number()),
+      // API credentials
+      apiKey: v.optional(v.string()),
+      apiSecret: v.optional(v.string()),
+      // Webhook configuration
+      webhookUrl: v.optional(v.string()),
+      webhookSecret: v.optional(v.string()),
+      // Google Sheets specific
+      spreadsheetId: v.optional(v.string()),
+      sheetName: v.optional(v.string()),
+      columnMapping: v.optional(v.record(v.string(), v.string())),
+      // Zapier specific
+      zapierHookUrl: v.optional(v.string()),
+      // Custom fields
+      customConfig: v.optional(v.record(v.string(), v.any())),
+    }),
+    permissions: v.array(v.union(
+      v.literal("read_contacts"),
+      v.literal("write_contacts"),
+      v.literal("trigger_campaigns"),
+      v.literal("read_analytics"),
+      v.literal("webhook_events")
+    )),
+    lastSyncAt: v.optional(v.number()),
+    lastHealthCheck: v.optional(v.number()),
+    healthStatus: v.union(
+      v.literal("healthy"),
+      v.literal("warning"),
+      v.literal("error"),
+      v.literal("unknown")
+    ),
+    errorMessage: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_type", ["type"])
+    .index("by_status", ["status"])
+    .index("by_health", ["healthStatus"])
+    .index("by_created_at", ["createdAt"]),
+
+  integrationSyncs: defineTable({
+    userId: v.id("users"),
+    integrationId: v.id("integrations"),
+    type: v.union(
+      v.literal("contacts_import"),
+      v.literal("contacts_export"),
+      v.literal("bidirectional_sync"),
+      v.literal("campaign_trigger"),
+      v.literal("analytics_export"),
+      v.literal("webhook_delivery")
+    ),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("running"),
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("cancelled")
+    ),
+    direction: v.union(
+      v.literal("inbound"),
+      v.literal("outbound"),
+      v.literal("bidirectional")
+    ),
+    data: v.object({
+      // Source and destination info
+      source: v.object({
+        type: v.string(),
+        identifier: v.optional(v.string()),
+        recordCount: v.optional(v.number()),
+      }),
+      destination: v.object({
+        type: v.string(),
+        identifier: v.optional(v.string()),
+      }),
+      // Processing stats
+      totalRecords: v.optional(v.number()),
+      processedRecords: v.optional(v.number()),
+      successfulRecords: v.optional(v.number()),
+      failedRecords: v.optional(v.number()),
+      duplicatesSkipped: v.optional(v.number()),
+      // Error tracking
+      errors: v.optional(v.array(v.object({
+        record: v.optional(v.string()),
+        error: v.string(),
+        timestamp: v.number(),
+      }))),
+      // Custom sync data
+      metadata: v.optional(v.record(v.string(), v.any())),
+    }),
+    scheduledAt: v.optional(v.number()),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    progress: v.number(), // 0-100
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_integration", ["integrationId"])
+    .index("by_type", ["type"])
+    .index("by_status", ["status"])
+    .index("by_created_at", ["createdAt"]),
+
+  webhookEndpoints: defineTable({
+    userId: v.id("users"),
+    integrationId: v.optional(v.id("integrations")),
+    name: v.string(),
+    url: v.string(),
+    method: v.union(v.literal("GET"), v.literal("POST"), v.literal("PUT"), v.literal("DELETE")),
+    isActive: v.boolean(),
+    events: v.array(v.union(
+      v.literal("contact_created"),
+      v.literal("contact_updated"),
+      v.literal("campaign_sent"),
+      v.literal("email_opened"),
+      v.literal("email_clicked"),
+      v.literal("unsubscribe"),
+      v.literal("bounce"),
+      v.literal("ab_test_complete")
+    )),
+    headers: v.optional(v.record(v.string(), v.string())),
+    authentication: v.optional(v.object({
+      type: v.union(v.literal("bearer"), v.literal("basic"), v.literal("api_key"), v.literal("none")),
+      credentials: v.optional(v.record(v.string(), v.string())),
+    })),
+    retryPolicy: v.object({
+      maxRetries: v.number(),
+      retryDelay: v.number(), // milliseconds
+      exponentialBackoff: v.boolean(),
+    }),
+    lastTriggered: v.optional(v.number()),
+    successCount: v.number(),
+    failureCount: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_integration", ["integrationId"])
+    .index("by_active", ["isActive"])
+    .index("by_created_at", ["createdAt"]),
+
+  webhookLogs: defineTable({
+    userId: v.id("users"),
+    webhookEndpointId: v.id("webhookEndpoints"),
+    event: v.string(),
+    payload: v.record(v.string(), v.any()),
+    response: v.optional(v.object({
+      status: v.number(),
+      headers: v.optional(v.record(v.string(), v.string())),
+      body: v.optional(v.string()),
+      responseTime: v.number(), // milliseconds
+    })),
+    success: v.boolean(),
+    error: v.optional(v.string()),
+    attempt: v.number(),
+    timestamp: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_webhook", ["webhookEndpointId"])
+    .index("by_event", ["event"])
+    .index("by_success", ["success"])
+    .index("by_timestamp", ["timestamp"]),
+
+  workflows: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    isActive: v.boolean(),
+    trigger: v.object({
+      type: v.union(
+        v.literal("webhook"),
+        v.literal("schedule"),
+        v.literal("contact_added"),
+        v.literal("tag_added"),
+        v.literal("email_event"),
+        v.literal("integration_sync"),
+        v.literal("custom")
+      ),
+      configuration: v.record(v.string(), v.any()),
+    }),
+    actions: v.array(v.object({
+      type: v.union(
+        v.literal("send_email"),
+        v.literal("add_tag"),
+        v.literal("update_contact"),
+        v.literal("create_campaign"),
+        v.literal("webhook_call"),
+        v.literal("integration_sync"),
+        v.literal("delay"),
+        v.literal("conditional"),
+        v.literal("custom")
+      ),
+      configuration: v.record(v.string(), v.any()),
+      conditions: v.optional(v.array(v.object({
+        field: v.string(),
+        operator: v.union(
+          v.literal("equals"),
+          v.literal("not_equals"),
+          v.literal("contains"),
+          v.literal("not_contains"),
+          v.literal("greater_than"),
+          v.literal("less_than"),
+          v.literal("exists"),
+          v.literal("not_exists")
+        ),
+        value: v.any(),
+      }))),
+      order: v.number(),
+    })),
+    executionCount: v.number(),
+    lastExecuted: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_active", ["isActive"])
+    .index("by_trigger_type", ["trigger.type"])
+    .index("by_created_at", ["createdAt"]),
+
+  workflowExecutions: defineTable({
+    userId: v.id("users"),
+    workflowId: v.id("workflows"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("running"),
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("cancelled")
+    ),
+    triggerData: v.record(v.string(), v.any()),
+    executionData: v.array(v.object({
+      actionType: v.string(),
+      status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed")),
+      result: v.optional(v.any()),
+      error: v.optional(v.string()),
+      executedAt: v.optional(v.number()),
+    })),
+    startedAt: v.number(),
+    completedAt: v.optional(v.number()),
+    error: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_workflow", ["workflowId"])
+    .index("by_status", ["status"])
+    .index("by_started_at", ["startedAt"]),
+
+  apiKeys: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    keyHash: v.string(), // hashed version for security
+    prefix: v.string(), // first 8 chars for identification
+    permissions: v.array(v.union(
+      v.literal("read_contacts"),
+      v.literal("write_contacts"),
+      v.literal("read_campaigns"),
+      v.literal("write_campaigns"),
+      v.literal("read_analytics"),
+      v.literal("send_emails"),
+      v.literal("manage_webhooks"),
+      v.literal("manage_integrations")
+    )),
+    isActive: v.boolean(),
+    expiresAt: v.optional(v.number()),
+    lastUsed: v.optional(v.number()),
+    usageCount: v.number(),
+    rateLimitConfig: v.optional(v.object({
+      requestsPerMinute: v.number(),
+      requestsPerHour: v.number(),
+      requestsPerDay: v.number(),
+    })),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_key_hash", ["keyHash"])
+    .index("by_prefix", ["prefix"])
+    .index("by_active", ["isActive"])
+    .index("by_created_at", ["createdAt"]),
+
+  // OAuth states for secure OAuth flows
+  oauthStates: defineTable({
+    provider: v.string(), // google, salesforce, hubspot, microsoft
+    state: v.string(), // CSRF protection state parameter
+    redirectUri: v.string(),
+    expiresAt: v.number(),
+    used: v.boolean(),
+    usedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_state", ["state"])
+    .index("by_provider", ["provider"])
+    .index("by_expires_at", ["expiresAt"])
+    .index("by_used", ["used"]),
+
+  // Email triggers for automated workflows
+  emailTriggers: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    triggerType: v.union(
+      v.literal("contact_created"),
+      v.literal("contact_updated"),
+      v.literal("tag_added"),
+      v.literal("tag_removed"),
+      v.literal("field_changed"),
+      v.literal("email_opened"),
+      v.literal("email_clicked"),
+      v.literal("link_clicked"),
+      v.literal("form_submitted"),
+      v.literal("date_reached"),
+      v.literal("inactivity_period"),
+      v.literal("score_threshold"),
+      v.literal("custom_event")
+    ),
+    conditions: v.object({
+      tags: v.optional(v.object({
+        include: v.optional(v.array(v.string())),
+        exclude: v.optional(v.array(v.string())),
+        operation: v.optional(v.union(v.literal("any"), v.literal("all")))
+      })),
+      fields: v.optional(v.array(v.object({
+        field: v.string(),
+        operator: v.union(
+          v.literal("equals"),
+          v.literal("not_equals"),
+          v.literal("contains"),
+          v.literal("not_contains"),
+          v.literal("starts_with"),
+          v.literal("ends_with"),
+          v.literal("greater_than"),
+          v.literal("less_than"),
+          v.literal("is_empty"),
+          v.literal("is_not_empty")
+        ),
+        value: v.optional(v.string())
+      }))),
+      timing: v.optional(v.object({
+        delay: v.optional(v.number()),
+        timeWindow: v.optional(v.object({
+          start: v.string(),
+          end: v.string(),
+          timezone: v.string(),
+          daysOfWeek: v.optional(v.array(v.number()))
+        })),
+        dateCondition: v.optional(v.object({
+          field: v.string(),
+          daysAfter: v.optional(v.number()),
+          daysBefore: v.optional(v.number())
+        }))
+      })),
+      engagement: v.optional(v.object({
+        emailsOpened: v.optional(v.number()),
+        emailsClicked: v.optional(v.number()),
+        lastActivity: v.optional(v.number()),
+        scoreRange: v.optional(v.object({
+          min: v.optional(v.number()),
+          max: v.optional(v.number())
+        }))
+      }))
+    }),
+    emailTemplate: v.object({
+      templateId: v.optional(v.id("templates")),
+      subject: v.string(),
+      content: v.string(),
+      personalizeFields: v.optional(v.array(v.string()))
+    }),
+    isActive: v.boolean(),
+    priority: v.optional(v.number()),
+    maxSendsPerContact: v.optional(v.number()),
+    cooldownPeriod: v.optional(v.number()),
+    statistics: v.object({
+      totalTriggers: v.number(),
+      totalSent: v.number(),
+      totalOpened: v.number(),
+      totalClicked: v.number(),
+      lastTriggered: v.number()
+    }),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_trigger_type", ["triggerType"])
+    .index("by_active", ["isActive"])
+    .index("by_priority", ["priority"])
+    .index("by_created_at", ["createdAt"]),
+
+  // Scheduled triggered emails
+  triggeredEmails: defineTable({
+    triggerId: v.id("emailTriggers"),
+    contactId: v.id("contacts"),
+    scheduledAt: v.number(),
+    sentAt: v.optional(v.number()),
+    status: v.union(
+      v.literal("scheduled"),
+      v.literal("sent"),
+      v.literal("failed"),
+      v.literal("cancelled")
+    ),
+    error: v.optional(v.string()),
+    messageId: v.optional(v.string()),
+    attempts: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_trigger", ["triggerId"])
+    .index("by_contact", ["contactId"])
+    .index("by_scheduled_at", ["scheduledAt"])
+    .index("by_status", ["status"])
+    .index("by_sent_at", ["sentAt"]),
+
+  // Event-driven campaigns
+  eventCampaigns: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    eventTriggers: v.array(v.object({
+      eventType: v.string(),
+      conditions: v.any(),
+      delay: v.optional(v.number()),
+      priority: v.optional(v.number())
+    })),
+    campaignFlow: v.object({
+      emails: v.array(v.object({
+        id: v.string(),
+        delay: v.number(),
+        template: v.object({
+          templateId: v.optional(v.id("templates")),
+          subject: v.string(),
+          content: v.string(),
+          personalizeFields: v.optional(v.array(v.string()))
+        }),
+        conditions: v.optional(v.any()),
+        actions: v.optional(v.array(v.any()))
+      })),
+      branches: v.optional(v.array(v.any())),
+      exitConditions: v.optional(v.array(v.any()))
+    }),
+    settings: v.object({
+      isActive: v.boolean(),
+      maxDuration: v.optional(v.number()),
+      maxEmailsPerContact: v.optional(v.number()),
+      respectUnsubscribe: v.boolean(),
+      respectOptOut: v.boolean(),
+      timeZone: v.optional(v.string()),
+      sendingWindow: v.optional(v.object({
+        start: v.string(),
+        end: v.string(),
+        daysOfWeek: v.array(v.number())
+      }))
+    }),
+    goals: v.optional(v.array(v.object({
+      name: v.string(),
+      type: v.string(),
+      config: v.any(),
+      weight: v.optional(v.number())
+    }))),
+    statistics: v.object({
+      totalTriggered: v.number(),
+      totalEntered: v.number(),
+      totalCompleted: v.number(),
+      totalExited: v.number(),
+      emailsSent: v.number(),
+      goalsReached: v.number(),
+      conversionRate: v.number()
+    }),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_active", ["settings.isActive"])
+    .index("by_created_at", ["createdAt"]),
+
+  // Contact journeys through event campaigns
+  contactJourneys: defineTable({
+    campaignId: v.id("eventCampaigns"),
+    contactId: v.id("contacts"),
+    triggerId: v.string(),
+    status: v.union(
+      v.literal("active"),
+      v.literal("completed"),
+      v.literal("paused"),
+      v.literal("failed"),
+      v.literal("exited")
+    ),
+    currentStep: v.string(),
+    nextAction: v.string(),
+    nextActionAt: v.number(),
+    eventData: v.any(),
+    progress: v.object({
+      emailsSent: v.number(),
+      emailsOpened: v.number(),
+      emailsClicked: v.number(),
+      goalsReached: v.number()
+    }),
+    metadata: v.any(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_campaign", ["campaignId"])
+    .index("by_contact", ["contactId"])
+    .index("by_status", ["status"])
+    .index("by_next_action_at", ["nextActionAt"])
+    .index("by_created_at", ["createdAt"]),
+
+  // Health checks for integration monitoring
+  healthChecks: defineTable({
+    integrationId: v.id("integrations"),
+    name: v.string(),
+    type: v.union(
+      v.literal("connectivity"),
+      v.literal("authentication"),
+      v.literal("rate_limit"),
+      v.literal("data_sync"),
+      v.literal("webhook_delivery"),
+      v.literal("api_response"),
+      v.literal("custom")
+    ),
+    config: v.object({
+      endpoint: v.optional(v.string()),
+      method: v.optional(v.string()),
+      expectedResponse: v.optional(v.any()),
+      timeout: v.optional(v.number()),
+      retries: v.optional(v.number()),
+      interval: v.number(),
+      alertThreshold: v.optional(v.number()),
+      criticalThreshold: v.optional(v.number())
+    }),
+    isActive: v.boolean(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("healthy"),
+      v.literal("unhealthy")
+    ),
+    lastCheck: v.number(),
+    consecutiveFailures: v.number(),
+    statistics: v.object({
+      totalChecks: v.number(),
+      successfulChecks: v.number(),
+      failedChecks: v.number(),
+      averageResponseTime: v.number(),
+      uptime: v.number()
+    }),
+    tags: v.optional(v.array(v.string())),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_integration", ["integrationId"])
+    .index("by_status", ["status"])
+    .index("by_active", ["isActive"])
+    .index("by_last_check", ["lastCheck"]),
+
+  // Health check results history
+  healthCheckResults: defineTable({
+    healthCheckId: v.id("healthChecks"),
+    success: v.boolean(),
+    responseTime: v.number(),
+    error: v.optional(v.string()),
+    details: v.optional(v.any()),
+    timestamp: v.number(),
+  })
+    .index("by_health_check", ["healthCheckId"])
+    .index("by_timestamp", ["timestamp"])
+    .index("by_success", ["success"]),
+
+  // Monitoring alerts
+  monitoringAlerts: defineTable({
+    healthCheckId: v.id("healthChecks"),
+    level: v.union(
+      v.literal("info"),
+      v.literal("warning"),
+      v.literal("error"),
+      v.literal("critical")
+    ),
+    message: v.string(),
+    metadata: v.optional(v.any()),
+    isActive: v.boolean(),
+    resolvedAt: v.optional(v.number()),
+    resolution: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_health_check", ["healthCheckId"])
+    .index("by_level", ["level"])
+    .index("by_active", ["isActive"])
+    .index("by_created_at", ["createdAt"]),
+
+  // Notification preferences for monitoring alerts
+  notificationPreferences: defineTable({
+    userId: v.id("users"),
+    email: v.object({
+      enabled: v.boolean(),
+      address: v.optional(v.string())
+    }),
+    webhook: v.object({
+      enabled: v.boolean(),
+      url: v.optional(v.string()),
+      headers: v.optional(v.record(v.string(), v.string()))
+    }),
+    levels: v.array(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"]),
+
+  // API request logs for rate limiting
+  apiRequestLogs: defineTable({
+    apiKeyId: v.id("apiKeys"),
+    endpoint: v.string(),
+    timestamp: v.number(),
+  })
+    .index("by_api_key", ["apiKeyId"])
+    .index("by_timestamp", ["timestamp"])
+    .index("by_api_key_timestamp", ["apiKeyId", "timestamp"]),
+
+  // Integration test suites
+  integrationTests: defineTable({
+    integrationId: v.id("integrations"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    type: v.union(
+      v.literal("connectivity"),
+      v.literal("authentication"), 
+      v.literal("data_sync"),
+      v.literal("webhooks"),
+      v.literal("rate_limiting"),
+      v.literal("error_handling"),
+      v.literal("performance"),
+      v.literal("data_integrity"),
+      v.literal("security"),
+      v.literal("compliance")
+    ),
+    config: v.object({
+      timeout: v.optional(v.number()),
+      retries: v.optional(v.number()),
+      expectedDuration: v.optional(v.number()),
+      testData: v.optional(v.any()),
+      assertions: v.optional(v.array(v.any())),
+      prerequisites: v.optional(v.array(v.string())),
+      cleanup: v.optional(v.boolean())
+    }),
+    isEnabled: v.boolean(),
+    schedule: v.optional(v.object({
+      cron: v.string(),
+      timezone: v.optional(v.string()),
+      nextRun: v.optional(v.number())
+    })),
+    tags: v.optional(v.array(v.string())),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_integration", ["integrationId"])
+    .index("by_type", ["type"])
+    .index("by_enabled", ["isEnabled"])
+    .index("by_created_at", ["createdAt"]),
+
+  // Integration test executions
+  integrationTestExecutions: defineTable({
+    testId: v.id("integrationTests"),
+    status: v.union(
+      v.literal("running"),
+      v.literal("passed"),
+      v.literal("failed"),
+      v.literal("skipped"),
+      v.literal("error")
+    ),
+    startedAt: v.number(),
+    completedAt: v.optional(v.number()),
+    duration: v.optional(v.number()),
+    results: v.optional(v.object({
+      assertions: v.optional(v.array(v.object({
+        name: v.string(),
+        passed: v.boolean(),
+        message: v.optional(v.string()),
+        actual: v.optional(v.any()),
+        expected: v.optional(v.any())
+      }))),
+      metrics: v.optional(v.object({
+        responseTime: v.optional(v.number()),
+        throughput: v.optional(v.number()),
+        errorRate: v.optional(v.number()),
+        dataAccuracy: v.optional(v.number())
+      })),
+      logs: v.optional(v.array(v.string())),
+      artifacts: v.optional(v.array(v.object({
+        name: v.string(),
+        type: v.string(),
+        url: v.optional(v.string()),
+        data: v.optional(v.any())
+      })))
+    })),
+    error: v.optional(v.string()),
+    triggeredBy: v.union(
+      v.literal("manual"),
+      v.literal("scheduled"),
+      v.literal("webhook"),
+      v.literal("deployment"),
+      v.literal("monitoring")
+    ),
+    triggeredByUser: v.optional(v.id("users")),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_test", ["testId"])
+    .index("by_status", ["status"])
+    .index("by_started_at", ["startedAt"])
+    .index("by_triggered_by", ["triggeredBy"]),
+
+  // Integration test schedules
+  integrationTestSchedules: defineTable({
+    testId: v.id("integrationTests"),
+    cron: v.string(),
+    timezone: v.string(),
+    isActive: v.boolean(),
+    lastRun: v.optional(v.number()),
+    nextRun: v.number(),
+    runCount: v.number(),
+    successCount: v.number(),
+    failureCount: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_test", ["testId"])
+    .index("by_active", ["isActive"])
+    .index("by_next_run", ["nextRun"])
+    .index("by_last_run", ["lastRun"]),
+
+  // Integration test reports
+  integrationTestReports: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    integrationIds: v.optional(v.array(v.id("integrations"))),
+    testIds: v.optional(v.array(v.id("integrationTests"))),
+    executionIds: v.array(v.id("integrationTestExecutions")),
+    summary: v.object({
+      totalTests: v.number(),
+      passedTests: v.number(),
+      failedTests: v.number(),
+      skippedTests: v.number(),
+      errorTests: v.number(),
+      totalDuration: v.number(),
+      averageDuration: v.number(),
+      successRate: v.number()
+    }),
+    generatedAt: v.number(),
+    generatedBy: v.id("users"),
+    format: v.union(
+      v.literal("json"),
+      v.literal("html"),
+      v.literal("pdf"),
+      v.literal("csv")
+    ),
+    url: v.optional(v.string()),
+    expiresAt: v.optional(v.number()),
+  })
+    .index("by_generated_at", ["generatedAt"])
+    .index("by_generated_by", ["generatedBy"])
+    .index("by_expires_at", ["expiresAt"]),
+
+  // Error logs for comprehensive error tracking
+  errorLogs: defineTable({
+    integrationId: v.optional(v.id("integrations")),
+    category: v.string(),
+    severity: v.string(),
+    message: v.string(),
+    details: v.optional(v.any()),
+    context: v.optional(v.object({
+      operation: v.optional(v.string()),
+      endpoint: v.optional(v.string()),
+      method: v.optional(v.string()),
+      requestId: v.optional(v.string()),
+      userId: v.optional(v.id("users")),
+      metadata: v.optional(v.any())
+    })),
+    stackTrace: v.optional(v.string()),
+    status: v.union(
+      v.literal("new"),
+      v.literal("retrying"),
+      v.literal("resolved"),
+      v.literal("failed")
+    ),
+    retryConfig: v.object({
+      maxRetries: v.number(),
+      strategy: v.string(),
+      baseDelay: v.number(),
+      maxDelay: v.number(),
+      backoffMultiplier: v.optional(v.number())
+    }),
+    retryCount: v.number(),
+    nextRetryAt: v.optional(v.number()),
+    resolvedAt: v.optional(v.number()),
+    resolution: v.optional(v.string()),
+    tags: v.array(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_integration", ["integrationId"])
+    .index("by_category", ["category"])
+    .index("by_severity", ["severity"])
+    .index("by_status", ["status"])
+    .index("by_next_retry", ["nextRetryAt"])
+    .index("by_created_at", ["createdAt"]),
+
+  // Error alerts for monitoring critical issues
+  errorAlerts: defineTable({
+    errorId: v.id("errorLogs"),
+    level: v.string(),
+    message: v.string(),
+    isActive: v.boolean(),
+    notificationsSent: v.array(v.object({
+      type: v.string(),
+      recipient: v.string(),
+      sentAt: v.number(),
+      success: v.boolean()
+    })),
+    resolvedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_error", ["errorId"])
+    .index("by_level", ["level"])
+    .index("by_active", ["isActive"])
+    .index("by_created_at", ["createdAt"]),
+
+  // Performance metrics for optimization
+  performanceMetrics: defineTable({
+    integrationId: v.optional(v.id("integrations")),
+    category: v.string(),
+    operation: v.string(),
+    value: v.number(),
+    unit: v.string(),
+    status: v.union(
+      v.literal("good"),
+      v.literal("warning"),
+      v.literal("critical")
+    ),
+    metadata: v.optional(v.any()),
+    tags: v.array(v.string()),
+    timestamp: v.number(),
+  })
+    .index("by_integration", ["integrationId"])
+    .index("by_category", ["category"])
+    .index("by_operation", ["operation"])
+    .index("by_status", ["status"])
+    .index("by_timestamp", ["timestamp"])
+    .index("by_category_timestamp", ["category", "timestamp"]),
+
+  // Optimization plans for performance improvements
+  optimizationPlans: defineTable({
+    integrationId: v.optional(v.id("integrations")),
+    name: v.string(),
+    description: v.optional(v.string()),
+    recommendations: v.array(v.any()),
+    targetMetrics: v.object({
+      responseTime: v.optional(v.number()),
+      errorRate: v.optional(v.number()),
+      throughput: v.optional(v.number()),
+      syncDuration: v.optional(v.number())
+    }),
+    timeline: v.optional(v.string()),
+    assignedTo: v.optional(v.id("users")),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("in_progress"),
+      v.literal("completed"),
+      v.literal("cancelled")
+    ),
+    progress: v.number(),
+    notes: v.optional(v.string()),
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_integration", ["integrationId"])
+    .index("by_status", ["status"])
+    .index("by_assigned_to", ["assignedTo"])
+    .index("by_created_at", ["createdAt"]),
+
+  // Security scans for vulnerability assessment
+  securityScans: defineTable({
+    integrationId: v.optional(v.id("integrations")),
+    name: v.string(),
+    description: v.optional(v.string()),
+    scanType: v.string(),
+    scope: v.object({
+      includeIntegrations: v.boolean(),
+      includeWebhooks: v.boolean(),
+      includeApiKeys: v.boolean(),
+      includeDataFlow: v.boolean(),
+      includeCompliance: v.boolean(),
+      specificEndpoints: v.optional(v.array(v.string()))
+    }),
+    configuration: v.object({
+      depth: v.optional(v.string()),
+      timeout: v.optional(v.number()),
+      retries: v.optional(v.number()),
+      parallelChecks: v.optional(v.number()),
+      complianceFrameworks: v.optional(v.array(v.string())),
+      customRules: v.optional(v.array(v.any()))
+    }),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("running"),
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("cancelled")
+    ),
+    progress: v.number(),
+    scheduledFor: v.optional(v.number()),
+    recurring: v.optional(v.object({
+      enabled: v.boolean(),
+      interval: v.string(),
+      nextRun: v.number()
+    })),
+    findings: v.array(v.any()),
+    summary: v.object({
+      totalChecks: v.number(),
+      passedChecks: v.number(),
+      failedChecks: v.number(),
+      criticalFindings: v.number(),
+      highFindings: v.number(),
+      mediumFindings: v.number(),
+      lowFindings: v.number(),
+      riskScore: v.number()
+    }),
+    error: v.optional(v.string()),
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_integration", ["integrationId"])
+    .index("by_scan_type", ["scanType"])
+    .index("by_status", ["status"])
+    .index("by_scheduled_for", ["scheduledFor"])
+    .index("by_created_at", ["createdAt"]),
+
+  // Security alerts for critical findings
+  securityAlerts: defineTable({
+    scanId: v.id("securityScans"),
+    findingId: v.string(),
+    severity: v.string(),
+    message: v.string(),
+    title: v.string(),
+    description: v.string(),
+    recommendation: v.string(),
+    isActive: v.boolean(),
+    acknowledgedAt: v.optional(v.number()),
+    acknowledgedBy: v.optional(v.id("users")),
+    notes: v.optional(v.string()),
+    resolvedAt: v.optional(v.number()),
+    resolvedBy: v.optional(v.id("users")),
+    resolution: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_scan", ["scanId"])
+    .index("by_severity", ["severity"])
+    .index("by_active", ["isActive"])
+    .index("by_created_at", ["createdAt"]),
+
+  // Integration versions for version control and rollbacks
+  integrationVersions: defineTable({
+    integrationId: v.id("integrations"),
+    version: v.string(),
+    versionType: v.union(
+      v.literal("major"),
+      v.literal("minor"),
+      v.literal("patch"),
+      v.literal("hotfix")
+    ),
+    changelog: v.string(),
+    configuration: v.any(),
+    dependencies: v.array(v.object({
+      name: v.string(),
+      version: v.string(),
+      required: v.boolean()
+    })),
+    compatibilityNotes: v.optional(v.string()),
+    migrationInstructions: v.optional(v.string()),
+    rollbackInstructions: v.optional(v.string()),
+    testResults: v.optional(v.any()),
+    deploymentStrategy: v.union(
+      v.literal("immediate"),
+      v.literal("scheduled"),
+      v.literal("canary"),
+      v.literal("blue_green"),
+      v.literal("rolling")
+    ),
+    scheduledDeployment: v.optional(v.number()),
+    canaryConfig: v.optional(v.object({
+      percentage: v.number(),
+      duration: v.number(),
+      successCriteria: v.array(v.string())
+    })),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("scheduled"),
+      v.literal("deploying"),
+      v.literal("deployed"),
+      v.literal("superseded"),
+      v.literal("failed"),
+      v.literal("cancelled")
+    ),
+    currentSnapshot: v.any(),
+    deploymentProgress: v.number(),
+    rollbackAvailable: v.boolean(),
+    error: v.optional(v.string()),
+    deployedAt: v.optional(v.number()),
+    supersededAt: v.optional(v.number()),
+    deploymentResult: v.optional(v.any()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_integration", ["integrationId"])
+    .index("by_version", ["version"])
+    .index("by_status", ["status"])
+    .index("by_scheduled_deployment", ["scheduledDeployment"])
+    .index("by_created_at", ["createdAt"]),
+
+  // Integration rollback history
+  integrationRollbacks: defineTable({
+    integrationId: v.id("integrations"),
+    fromVersionId: v.optional(v.id("integrationVersions")),
+    toVersionId: v.id("integrationVersions"),
+    reason: v.string(),
+    status: v.union(
+      v.literal("in_progress"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    error: v.optional(v.string()),
+    initiatedAt: v.number(),
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_integration", ["integrationId"])
+    .index("by_status", ["status"])
+    .index("by_initiated_at", ["initiatedAt"]),
+
+  // Audit logging system
+  auditLogs: defineTable({
+    userId: v.optional(v.id("users")),
+    integrationId: v.optional(v.id("integrations")),
+    eventType: v.union(
+      // Authentication events
+      v.literal("user_login"),
+      v.literal("user_logout"),
+      v.literal("api_key_created"),
+      v.literal("api_key_revoked"),
+      v.literal("oauth_token_refreshed"),
+      v.literal("permission_granted"),
+      v.literal("permission_revoked"),
+      // Integration events
+      v.literal("integration_created"),
+      v.literal("integration_updated"),
+      v.literal("integration_deleted"),
+      v.literal("integration_enabled"),
+      v.literal("integration_disabled"),
+      v.literal("integration_sync"),
+      v.literal("integration_webhook"),
+      // Data events
+      v.literal("data_export"),
+      v.literal("data_import"),
+      v.literal("data_deletion"),
+      v.literal("data_modification"),
+      v.literal("backup_created"),
+      v.literal("backup_restored"),
+      // System events
+      v.literal("system_config_change"),
+      v.literal("security_scan"),
+      v.literal("performance_alert"),
+      v.literal("error_occurred"),
+      v.literal("rate_limit_exceeded"),
+      // Compliance events
+      v.literal("gdpr_request"),
+      v.literal("data_retention_policy"),
+      v.literal("audit_report_generated"),
+      v.literal("compliance_check"),
+      // Campaign events
+      v.literal("campaign_created"),
+      v.literal("campaign_sent"),
+      v.literal("email_delivered"),
+      v.literal("email_bounced")
+    ),
+    resource: v.string(),
+    resourceId: v.optional(v.string()),
+    action: v.string(),
+    details: v.any(),
+    ipAddress: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+    sessionId: v.optional(v.string()),
+    requestId: v.optional(v.string()),
+    riskLevel: v.union(
+      v.literal("low"),
+      v.literal("medium"),
+      v.literal("high"),
+      v.literal("critical")
+    ),
+    tags: v.optional(v.array(v.string())),
+    metadata: v.optional(v.any()),
+    relatedEvents: v.optional(v.array(v.id("auditLogs"))),
+    timestamp: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_integration", ["integrationId"])
+    .index("by_event_type", ["eventType"])
+    .index("by_resource", ["resource"])
+    .index("by_risk_level", ["riskLevel"])
+    .index("by_timestamp", ["timestamp"])
+    .index("by_created_at", ["createdAt"])
+    .index("by_user_timestamp", ["userId", "timestamp"])
+    .index("by_integration_timestamp", ["integrationId", "timestamp"]),
+
+  // Audit log reports and compliance
+  auditReports: defineTable({
+    userId: v.id("users"),
+    reportType: v.union(
+      v.literal("compliance"),
+      v.literal("security"),
+      v.literal("data_access"),
+      v.literal("system_changes"),
+      v.literal("user_activity"),
+      v.literal("integration_activity"),
+      v.literal("custom")
+    ),
+    title: v.string(),
+    description: v.optional(v.string()),
+    filters: v.any(),
+    dateRange: v.object({
+      startDate: v.number(),
+      endDate: v.number(),
+    }),
+    eventCount: v.number(),
+    riskMetrics: v.object({
+      lowRisk: v.number(),
+      mediumRisk: v.number(),
+      highRisk: v.number(),
+      criticalRisk: v.number(),
+    }),
+    complianceFrameworks: v.optional(v.array(v.string())),
+    findings: v.optional(v.array(v.any())),
+    recommendations: v.optional(v.array(v.string())),
+    exportedAt: v.optional(v.number()),
+    exportFormat: v.optional(v.union(
+      v.literal("json"),
+      v.literal("csv"),
+      v.literal("pdf")
+    )),
+    scheduledReport: v.optional(v.object({
+      frequency: v.union(
+        v.literal("daily"),
+        v.literal("weekly"),
+        v.literal("monthly"),
+        v.literal("quarterly")
+      ),
+      nextRunAt: v.number(),
+      enabled: v.boolean(),
+    })),
+    status: v.union(
+      v.literal("generating"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_type", ["reportType"])
+    .index("by_status", ["status"])
+    .index("by_created_at", ["createdAt"])
+    .index("by_scheduled_next_run", ["scheduledReport.nextRunAt"]),
+
+  // Integration documentation system
+  integrationDocumentation: defineTable({
+    userId: v.id("users"),
+    integrationId: v.id("integrations"),
+    title: v.string(),
+    content: v.any(),
+    format: v.union(
+      v.literal("markdown"),
+      v.literal("html"),
+      v.literal("pdf"),
+      v.literal("interactive"),
+      v.literal("video_tutorial")
+    ),
+    version: v.string(),
+    status: v.union(
+      v.literal("generating"),
+      v.literal("generated"),
+      v.literal("error")
+    ),
+    documentationType: v.optional(v.union(
+      v.literal("api_reference"),
+      v.literal("setup_guide"),
+      v.literal("troubleshooting"),
+      v.literal("best_practices"),
+      v.literal("migration_guide"),
+      v.literal("webhook_setup"),
+      v.literal("authentication"),
+      v.literal("rate_limits"),
+      v.literal("error_codes"),
+      v.literal("code_examples")
+    )),
+    tags: v.optional(v.array(v.string())),
+    viewCount: v.optional(v.number()),
+    lastViewedAt: v.optional(v.number()),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_integration", ["integrationId"])
+    .index("by_format", ["format"])
+    .index("by_status", ["status"])
+    .index("by_type", ["documentationType"])
+    .index("by_created_at", ["createdAt"])
+    .index("by_updated_at", ["updatedAt"]),
+
+  // Integration backup and migration system
+  integrationBackups: defineTable({
+    userId: v.id("users"),
+    integrationId: v.id("integrations"),
+    backupType: v.union(
+      v.literal("full"),
+      v.literal("configuration"),
+      v.literal("data"),
+      v.literal("scheduled")
+    ),
+    name: v.string(),
+    description: v.optional(v.string()),
+    backupData: v.any(),
+    size: v.number(),
+    compression: v.optional(v.string()),
+    encryption: v.optional(v.object({
+      enabled: v.boolean(),
+      algorithm: v.string(),
+      keyId: v.string(),
+    })),
+    storage: v.object({
+      location: v.string(),
+      provider: v.string(),
+      path: v.string(),
+    }),
+    schedule: v.optional(v.object({
+      frequency: v.union(
+        v.literal("hourly"),
+        v.literal("daily"),
+        v.literal("weekly"),
+        v.literal("monthly")
+      ),
+      nextBackupAt: v.number(),
+      enabled: v.boolean(),
+      retentionDays: v.number(),
+    })),
+    status: v.union(
+      v.literal("creating"),
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("restoring"),
+      v.literal("deleted")
+    ),
+    progress: v.optional(v.number()),
+    error: v.optional(v.string()),
+    checksumMD5: v.optional(v.string()),
+    checksumSHA256: v.optional(v.string()),
+    restoredCount: v.optional(v.number()),
+    lastRestoredAt: v.optional(v.number()),
+    expiresAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_integration", ["integrationId"])
+    .index("by_type", ["backupType"])
+    .index("by_status", ["status"])
+    .index("by_created_at", ["createdAt"])
+    .index("by_next_backup", ["schedule.nextBackupAt"])
+    .index("by_expires_at", ["expiresAt"]),
+
+  // Integration migration history
+  integrationMigrations: defineTable({
+    userId: v.id("users"),
+    sourceIntegrationId: v.optional(v.id("integrations")),
+    targetIntegrationId: v.id("integrations"),
+    migrationType: v.union(
+      v.literal("provider_change"),
+      v.literal("version_upgrade"),
+      v.literal("configuration_update"),
+      v.literal("data_migration"),
+      v.literal("platform_migration")
+    ),
+    name: v.string(),
+    description: v.optional(v.string()),
+    migrationPlan: v.any(),
+    dataMapping: v.optional(v.any()),
+    validation: v.optional(v.object({
+      preChecks: v.array(v.any()),
+      postChecks: v.array(v.any()),
+      dataIntegrity: v.boolean(),
+    })),
+    phases: v.array(v.object({
+      name: v.string(),
+      status: v.union(
+        v.literal("pending"),
+        v.literal("in_progress"),
+        v.literal("completed"),
+        v.literal("failed"),
+        v.literal("skipped")
+      ),
+      startedAt: v.optional(v.number()),
+      completedAt: v.optional(v.number()),
+      error: v.optional(v.string()),
+      progress: v.optional(v.number()),
+    })),
+    rollbackPlan: v.optional(v.any()),
+    status: v.union(
+      v.literal("planned"),
+      v.literal("in_progress"),
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("rolled_back")
+    ),
+    progress: v.number(),
+    error: v.optional(v.string()),
+    metrics: v.optional(v.object({
+      recordsMigrated: v.number(),
+      duration: v.number(),
+      downtime: v.number(),
+      errorCount: v.number(),
+    })),
+    rollbackAvailable: v.boolean(),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_source_integration", ["sourceIntegrationId"])
+    .index("by_target_integration", ["targetIntegrationId"])
+    .index("by_type", ["migrationType"])
+    .index("by_status", ["status"])
+    .index("by_created_at", ["createdAt"]),
+
+  // Missing tables for audit and testing
+  auditAlerts: defineTable({
+    severity: v.string(),
+    message: v.string(),
+    timestamp: v.number(),
+    acknowledged: v.boolean(),
+    resolvedAt: v.optional(v.number()),
+    metadata: v.optional(v.any()),
+  }),
+
+  auditTrails: defineTable({
+    name: v.string(),
+    description: v.string(),
+    eventIds: v.array(v.string()),
+    createdAt: v.number(),
+    userId: v.id("users"),
+  }),
+
+  testResults: defineTable({
+    testId: v.id("integrationTests"),
+    results: v.any(),
+    status: v.string(),
+    timestamp: v.number(),
+    duration: v.number(),
+    errors: v.array(v.string()),
+  }),
 });

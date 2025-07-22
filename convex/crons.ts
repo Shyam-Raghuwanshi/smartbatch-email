@@ -43,4 +43,92 @@ crons.daily(
   {}
 );
 
+// Run health checks every 5 minutes
+crons.interval(
+  "health-checks",
+  { minutes: 5 },
+  internal.monitoring.runAllHealthChecks,
+  {}
+);
+
+// Process scheduled triggered emails every minute
+crons.interval(
+  "triggered-emails",
+  { minutes: 1 },
+  internal.emailTriggers.processScheduledTriggerEmails,
+  {}
+);
+
+// Process scheduled event campaign actions every minute
+crons.interval(
+  "event-campaigns",
+  { minutes: 1 },
+  internal.eventCampaigns.processScheduledActions,
+  {}
+);
+
+// Clean up expired OAuth states every hour
+crons.interval(
+  "oauth-cleanup",
+  { hours: 1 },
+  internal.oauth.cleanupExpiredOAuthStates,
+  {}
+);
+
+// Clean up old webhook logs daily (keep last 30 days)
+crons.daily(
+  "webhook-cleanup",
+  { hourUTC: 4, minuteUTC: 0 },
+  internal.scheduler.cleanupOldWebhookLogs,
+  { before: Date.now() - (30 * 24 * 60 * 60 * 1000) }
+);
+
+// Run comprehensive scheduled tasks every 10 minutes
+crons.interval(
+  "scheduled-tasks",
+  { minutes: 10 },
+  internal.scheduler.runScheduledTasks,
+  {}
+);
+
+// Error handling and retries - every 5 minutes
+crons.interval(
+  "process-error-retries",
+  { minutes: 5 },
+  internal.errorHandling.processPendingRetries,
+  {}
+);
+
+// Performance metrics cleanup - daily at 4 AM
+crons.daily(
+  "cleanup-old-metrics",
+  { hourUTC: 4, minuteUTC: 0 },
+  internal.performanceOptimization.cleanupOldMetrics,
+  { olderThanDays: 7 }
+);
+
+// Error logs cleanup - weekly on Sunday at 5 AM
+crons.weekly(
+  "cleanup-old-errors",
+  { dayOfWeek: "sunday", hourUTC: 5, minuteUTC: 0 },
+  internal.errorHandling.cleanupOldErrors,
+  { olderThanDays: 30 }
+);
+
+// Auto-tune integrations - daily at 6 AM
+crons.daily(
+  "auto-tune-integrations",
+  { hourUTC: 6, minuteUTC: 0 },
+  internal.scheduler.autoTuneIntegrations,
+  {}
+);
+
+// Integration testing - every 4 hours
+crons.interval(
+  "run-integration-tests",
+  { hours: 4 },
+  internal.integrationTesting.runScheduledTests,
+  {}
+);
+
 export default crons;

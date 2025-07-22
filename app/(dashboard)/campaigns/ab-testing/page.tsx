@@ -1,32 +1,33 @@
 "use client";
 
 import { useState } from "react";
-import { ABTestDashboard } from "@/components/campaigns/ABTestDashboard";
-import { ABTestSetup } from "@/components/campaigns/ABTestSetup";
-import { ABTestResults } from "@/components/campaigns/ABTestResults";
-import { AdvancedTesting } from "@/components/campaigns/AdvancedTesting";
+import ABTestDashboard from "@/components/campaigns/ABTestDashboard";
+import ABTestSetup from "@/components/campaigns/ABTestSetup";
+import ABTestResults from "@/components/campaigns/ABTestResults";
+import AdvancedTesting from "@/components/campaigns/AdvancedTesting";
 import ABTestExecution from "@/components/campaigns/ABTestExecution";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BeakerIcon, ChartBarIcon, CogIcon, BrainIcon, PlayIcon } from "@heroicons/react/24/outline";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Beaker, BeakerIcon, BrainIcon, ChartBarIcon, PlayIcon } from "lucide-react";
+import { Id } from "@/convex/_generated/dataModel";
 
 export default function ABTestingPage() {
-  const [activeTestId, setActiveTestId] = useState<string | null>(null);
+  const [activeTestId, setActiveTestId] = useState<Id<"abTests"> | null>(null);
   const [activeTab, setActiveTab] = useState("dashboard");
 
   // Get A/B tests overview
   const abTests = useQuery(api.abTesting.getABTestsByUser);
   const dashboardStats = {
     total: abTests?.length || 0,
-    active: abTests?.filter(test => test.status === 'active').length || 0,
-    completed: abTests?.filter(test => test.status === 'completed').length || 0,
-    draft: abTests?.filter(test => test.status === 'draft').length || 0,
+    active: abTests?.filter((test: any) => test.status === 'active').length || 0,
+    completed: abTests?.filter((test: any) => test.status === 'completed').length || 0,
+    draft: abTests?.filter((test: any) => test.status === 'draft').length || 0,
   };
 
-  const handleTestCreated = (testId: string) => {
+  const handleTestCreated = (testId: Id<"abTests">) => {
     setActiveTestId(testId);
     setActiveTab("execution");
   };
@@ -61,7 +62,7 @@ export default function ABTestingPage() {
             Dashboard
           </TabsTrigger>
           <TabsTrigger value="setup" className="flex items-center gap-2">
-            <BeakerIcon className="h-4 w-4" />
+            <Beaker className="h-4 w-4" />
             Create Test
           </TabsTrigger>
           <TabsTrigger value="execution" className="flex items-center gap-2">
@@ -79,12 +80,7 @@ export default function ABTestingPage() {
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-6">
-          <ABTestDashboard 
-            onTestSelect={(testId) => {
-              setActiveTestId(testId);
-              setActiveTab("execution");
-            }}
-          />
+          <ABTestDashboard />
         </TabsContent>
 
         <TabsContent value="setup" className="space-y-6">
@@ -96,7 +92,7 @@ export default function ABTestingPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ABTestSetup 
+              <ABTestSetup
                 onTestCreated={handleTestCreated}
               />
             </CardContent>
@@ -105,8 +101,8 @@ export default function ABTestingPage() {
 
         <TabsContent value="execution" className="space-y-6">
           {activeTestId ? (
-            <ABTestExecution 
-              testId={activeTestId} 
+            <ABTestExecution
+              testId={activeTestId}
               onTestComplete={handleTestComplete}
             />
           ) : (
@@ -155,7 +151,7 @@ export default function ABTestingPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <AdvancedTesting />
+              <AdvancedTesting testType="multivariate" />
             </CardContent>
           </Card>
         </TabsContent>
