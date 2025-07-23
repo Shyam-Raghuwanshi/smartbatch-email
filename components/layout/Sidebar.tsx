@@ -37,6 +37,7 @@ const navigation: NavItem[] = [
     badge: '3',
     children: [
       { name: 'All Campaigns', href: '/campaigns', icon: Mail },
+      { name: 'Advanced Campaigns', href: '/campaigns/advanced', icon: Brain },
       { name: 'Schedule Management', href: '/campaigns/schedule', icon: Calendar },
       { name: 'Test Scheduling', href: '/campaigns/test-scheduling', icon: Settings },
     ]

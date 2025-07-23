@@ -51,6 +51,11 @@ import { CampaignStats } from '@/components/campaigns/CampaignStats';
 import { CampaignDetailModal } from '@/components/campaigns/CampaignDetailModal';
 import { LoadingCard, TableLoadingSkeleton } from '@/components/ui/loading';
 import { toast } from 'sonner';
+import { AutomatedCampaigns } from '@/components/campaigns/AutomatedCampaigns';
+import { VisualWorkflowBuilder } from '@/components/campaigns/VisualWorkflowBuilder';
+import { BehavioralTriggers } from '@/components/campaigns/BehavioralTriggers';
+import { AdvancedScheduling } from '@/components/campaigns/AdvancedScheduling';
+import { CampaignTemplates } from '@/components/campaigns/CampaignTemplates';
 
 type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'paused' | 'cancelled';
 
