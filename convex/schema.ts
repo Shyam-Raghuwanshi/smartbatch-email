@@ -85,8 +85,11 @@ export default defineSchema({
     })),
   })
     .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"])
+    .index("by_user_created", ["userId", "createdAt"])
     .index("by_status", ["status"])
-    .index("by_scheduled_at", ["scheduledAt"]),
+    .index("by_scheduled_at", ["scheduledAt"])
+    .index("by_created_at", ["createdAt"]),
 
   // Campaign schedule instances for recurring campaigns
   campaignSchedules: defineTable({
@@ -167,8 +170,12 @@ export default defineSchema({
     errorMessage: v.optional(v.string()),
   })
     .index("by_campaign", ["campaignId"])
+    .index("by_campaign_status", ["campaignId", "status"])
     .index("by_recipient", ["recipient"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_sent_at", ["sentAt"])
+    .index("by_opened_at", ["openedAt"])
+    .index("by_clicked_at", ["clickedAt"]),
 
   templates: defineTable({
     userId: v.id("users"),
@@ -204,11 +211,14 @@ export default defineSchema({
     })),
   })
     .index("by_user", ["userId"])
+    .index("by_user_category", ["userId", "category"])
+    .index("by_user_updated", ["userId", "updatedAt"])
     .index("by_name", ["name"])
     .index("by_category", ["category"])
     .index("by_tags", ["tags"])
     .index("by_public", ["isPublic"])
-    .index("by_updated_at", ["updatedAt"]),
+    .index("by_updated_at", ["updatedAt"])
+    .index("by_usage_count", ["usageCount"]),
 
   contacts: defineTable({
     userId: v.id("users"),
@@ -244,13 +254,17 @@ export default defineSchema({
     ispDomain: v.optional(v.string()), // gmail.com, yahoo.com, etc.
   })
     .index("by_user", ["userId"])
+    .index("by_user_active", ["userId", "isActive"])
+    .index("by_user_created", ["userId", "createdAt"])
+    .index("by_user_engagement", ["userId", "lastEngagement"])
     .index("by_email", ["email"])
     .index("by_tags", ["tags"])
     .index("by_company", ["company"])
     .index("by_updated_at", ["updatedAt"])
     .index("by_last_engagement", ["lastEngagement"])
     .index("by_timezone", ["timezone"])
-    .index("by_isp_domain", ["ispDomain"]),
+    .index("by_isp_domain", ["ispDomain"])
+    .index("by_source", ["source"]),
 
   contactSegments: defineTable({
     userId: v.id("users"),
@@ -2104,4 +2118,308 @@ export default defineSchema({
     .index("by_public", ["isPublic"])
     .index("by_tags", ["tags"])
     .index("by_updated_at", ["updatedAt"]),
+
+  // GDPR Compliance and Data Protection
+  gdprConsents: defineTable({
+    userId: v.id("users"),
+    contactEmail: v.string(),
+    consentType: v.union(
+      v.literal("marketing"),
+      v.literal("analytics"),
+      v.literal("functional"),
+      v.literal("necessary")
+    ),
+    consentStatus: v.boolean(),
+    consentDate: v.number(),
+    withdrawalDate: v.optional(v.number()),
+    source: v.string(), // form, api, import, etc.
+    ipAddress: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+    legalBasis: v.string(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_contact", ["contactEmail"])
+    .index("by_type", ["consentType"])
+    .index("by_status", ["consentStatus"])
+    .index("by_date", ["consentDate"]),
+
+  gdprRequests: defineTable({
+    userId: v.id("users"),
+    contactEmail: v.string(),
+    requestType: v.union(
+      v.literal("access"),
+      v.literal("deletion"),
+      v.literal("portability"),
+      v.literal("rectification")
+    ),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("rejected")
+    ),
+    submittedAt: v.number(),
+    processedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    processorUserId: v.optional(v.id("users")),
+    notes: v.optional(v.string()),
+    attachments: v.optional(v.array(v.string())),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_contact", ["contactEmail"])
+    .index("by_type", ["requestType"])
+    .index("by_status", ["status"])
+    .index("by_submitted", ["submittedAt"]),
+
+  dataRetentionPolicies: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    dataType: v.string(),
+    retentionPeriod: v.number(), // days
+    autoDelete: v.boolean(),
+    isActive: v.boolean(),
+    lastExecuted: v.optional(v.number()),
+    nextExecution: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_type", ["dataType"])
+    .index("by_active", ["isActive"])
+    .index("by_next_execution", ["nextExecution"]),
+
+  // Data Encryption and Security
+  encryptionKeys: defineTable({
+    userId: v.id("users"),
+    keyId: v.string(),
+    algorithm: v.string(),
+    keySize: v.number(),
+    purpose: v.union(
+      v.literal("field_encryption"),
+      v.literal("file_encryption"),
+      v.literal("backup_encryption")
+    ),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    rotatedAt: v.optional(v.number()),
+    expiresAt: v.optional(v.number()),
+    usageCount: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_key_id", ["keyId"])
+    .index("by_purpose", ["purpose"])
+    .index("by_active", ["isActive"])
+    .index("by_expires", ["expiresAt"]),
+
+  encryptedData: defineTable({
+    userId: v.id("users"),
+    dataType: v.string(),
+    recordId: v.string(),
+    fieldName: v.string(),
+    encryptedValue: v.string(),
+    keyId: v.string(),
+    algorithm: v.string(),
+    iv: v.string(),
+    createdAt: v.number(),
+    lastAccessed: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_record", ["recordId", "fieldName"])
+    .index("by_key", ["keyId"])
+    .index("by_type", ["dataType"]),
+
+  rateLimitViolations: defineTable({
+    userId: v.optional(v.id("users")),
+    ipAddress: v.string(),
+    endpoint: v.string(),
+    method: v.string(),
+    violationType: v.union(
+      v.literal("rate_exceeded"),
+      v.literal("burst_exceeded"),
+      v.literal("quota_exceeded")
+    ),
+    requestCount: v.number(),
+    windowStart: v.number(),
+    windowEnd: v.number(),
+    userAgent: v.optional(v.string()),
+    blocked: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_ip", ["ipAddress"])
+    .index("by_endpoint", ["endpoint"])
+    .index("by_violation_type", ["violationType"])
+    .index("by_created_at", ["createdAt"]),
+
+  // Email Compliance
+  emailBounces: defineTable({
+    userId: v.id("users"),
+    campaignId: v.optional(v.id("campaigns")),
+    emailAddress: v.string(),
+    bounceType: v.union(
+      v.literal("soft"),
+      v.literal("hard")
+    ),
+    bounceReason: v.string(),
+    bounceCode: v.optional(v.string()),
+    diagnosticCode: v.optional(v.string()),
+    isTransient: v.boolean(),
+    retryCount: v.number(),
+    lastRetryAt: v.optional(v.number()),
+    suppressedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_email", ["emailAddress"])
+    .index("by_campaign", ["campaignId"])
+    .index("by_type", ["bounceType"])
+    .index("by_suppressed", ["suppressedAt"]),
+
+  spamComplaints: defineTable({
+    userId: v.id("users"),
+    campaignId: v.optional(v.id("campaigns")),
+    emailAddress: v.string(),
+    complaintType: v.union(
+      v.literal("abuse"),
+      v.literal("fraud"),
+      v.literal("virus"),
+      v.literal("other")
+    ),
+    feedbackType: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+    complaintSource: v.string(), // ISP or feedback loop
+    suppressedAt: v.number(),
+    createdAt: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_email", ["emailAddress"])
+    .index("by_campaign", ["campaignId"])
+    .index("by_type", ["complaintType"])
+    .index("by_source", ["complaintSource"]),
+
+  suppressionList: defineTable({
+    userId: v.id("users"),
+    emailAddress: v.string(),
+    reason: v.union(
+      v.literal("hard_bounce"),
+      v.literal("soft_bounce_limit"),
+      v.literal("spam_complaint"),
+      v.literal("unsubscribe"),
+      v.literal("manual"),
+      v.literal("list_cleaning")
+    ),
+    source: v.string(),
+    suppressedAt: v.number(),
+    expiresAt: v.optional(v.number()),
+    notes: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_email", ["emailAddress"])
+    .index("by_reason", ["reason"])
+    .index("by_suppressed", ["suppressedAt"])
+    .index("by_expires", ["expiresAt"]),
+
+  unsubscribeTokens: defineTable({
+    userId: v.id("users"),
+    campaignId: v.optional(v.id("campaigns")),
+    emailAddress: v.string(),
+    token: v.string(),
+    isUsed: v.boolean(),
+    usedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    ipAddress: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+  })
+    .index("by_token", ["token"])
+    .index("by_user", ["userId"])
+    .index("by_email", ["emailAddress"])
+    .index("by_campaign", ["campaignId"])
+    .index("by_expires", ["expiresAt"]),
+
+  // Role-Based Access Control
+  teams: defineTable({
+    ownerId: v.id("users"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    settings: v.object({
+      allowInvitations: v.boolean(),
+      requireApproval: v.boolean(),
+      defaultRole: v.string(),
+      maxMembers: v.optional(v.number()),
+    }),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_name", ["name"]),
+
+  teamMembers: defineTable({
+    teamId: v.id("teams"),
+    userId: v.id("users"),
+    role: v.union(
+      v.literal("owner"),
+      v.literal("admin"),
+      v.literal("manager"),
+      v.literal("editor"),
+      v.literal("viewer")
+    ),
+    permissions: v.array(v.string()),
+    status: v.union(
+      v.literal("active"),
+      v.literal("pending"),
+      v.literal("suspended")
+    ),
+    invitedBy: v.optional(v.id("users")),
+    joinedAt: v.number(),
+    lastActiveAt: v.optional(v.number()),
+  })
+    .index("by_team", ["teamId"])
+    .index("by_user", ["userId"])
+    .index("by_role", ["role"])
+    .index("by_status", ["status"]),
+
+  teamInvitations: defineTable({
+    teamId: v.id("teams"),
+    email: v.string(),
+    role: v.string(),
+    permissions: v.array(v.string()),
+    invitedBy: v.id("users"),
+    token: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("accepted"),
+      v.literal("declined"),
+      v.literal("expired")
+    ),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    respondedAt: v.optional(v.number()),
+  })
+    .index("by_team", ["teamId"])
+    .index("by_email", ["email"])
+    .index("by_token", ["token"])
+    .index("by_status", ["status"])
+    .index("by_expires", ["expiresAt"]),
+
+  rolePermissions: defineTable({
+    userId: v.id("users"),
+    role: v.string(),
+    permissions: v.array(v.string()),
+    resourceType: v.optional(v.string()),
+    resourceId: v.optional(v.string()),
+    grantedBy: v.optional(v.id("users")),
+    grantedAt: v.number(),
+    expiresAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_role", ["role"])
+    .index("by_resource", ["resourceType", "resourceId"])
+    .index("by_expires", ["expiresAt"]),
 });

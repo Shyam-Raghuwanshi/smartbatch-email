@@ -2,26 +2,24 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Mail, 
-  Settings, 
-  Calendar, 
-  Users, 
-  TrendingUp,
+import {
+  Mail,
+  Settings,
   Zap,
   GitBranch,
   Target,
   Clock,
   Plus
 } from 'lucide-react';
-import { VisualWorkflowBuilder } from '@/components/campaigns/VisualWorkflowBuilder';
-import { AutomatedCampaigns } from '@/components/campaigns/AutomatedCampaigns';
+import VisualWorkflowBuilder from '@/components/campaigns/VisualWorkflowBuilder';
+
 import { BehavioralTriggers } from '@/components/campaigns/BehavioralTriggers';
-import { AdvancedScheduling } from '@/components/campaigns/AdvancedScheduling';
-import { CampaignTemplates } from '@/components/campaigns/CampaignTemplates';
+import AdvancedScheduling from '@/components/campaigns/AdvancedScheduling';
+import CampaignTemplates from '@/components/campaigns/CampaignTemplates';
+import { AutomatedCampaigns } from '@/components/campaigns/AutomatedCampaigns';
 
 export default function AdvancedCampaignsPage() {
   const [activeTab, setActiveTab] = useState('drip');

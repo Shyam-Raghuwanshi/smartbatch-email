@@ -1,5 +1,6 @@
-export { default as AutomatedCampaigns } from './AutomatedCampaigns';
-export { default as VisualWorkflowBuilder } from './VisualWorkflowBuilder';
-export { default as BehavioralTriggers } from './BehavioralTriggers';
-export { default as AdvancedScheduling } from './AdvancedScheduling';
-export { default as CampaignTemplates } from './CampaignTemplates';
+export { AutomatedCampaigns } from '../AutomatedCampaigns';
+export { default as VisualWorkflowBuilder } from '../VisualWorkflowBuilder';
+// Placeholder exports for components that need to be created
+export { BehavioralTriggers } from './BehavioralTriggers';
+export { AdvancedScheduling } from './AdvancedScheduling';
+export { CampaignTemplates } from './CampaignTemplates';
