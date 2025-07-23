@@ -9,7 +9,8 @@ import {
   Users,
   BarChart3,
   Settings,
-  Menu
+  Menu,
+  Brain
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ const navigation: NavItem[] = [
   { name: 'Templates', href: '/templates', icon: FileText },
   { name: 'Contacts', href: '/contacts', icon: Users },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+  { name: 'AI Features', href: '/ai', icon: Brain, badge: 'NEW' },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

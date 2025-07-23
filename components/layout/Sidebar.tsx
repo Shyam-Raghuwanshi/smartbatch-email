@@ -11,7 +11,8 @@ import {
   Settings,
   Menu,
   Filter,
-  Calendar
+  Calendar,
+  Brain
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -51,6 +52,7 @@ const navigation: NavItem[] = [
     ]
   },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+  { name: 'AI Insights', href: '/ai', icon: Brain },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

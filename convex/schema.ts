@@ -2068,4 +2068,40 @@ export default defineSchema({
     duration: v.number(),
     errors: v.array(v.string()),
   }),
+
+  // Content Library Components
+  contentComponents: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    type: v.string(), // 'header', 'footer', 'cta', 'text_block', 'image_block', 'social_media'
+    content: v.string(),
+    htmlContent: v.optional(v.string()),
+    category: v.string(),
+    tags: v.array(v.string()),
+    description: v.optional(v.string()),
+    variables: v.optional(v.array(v.string())),
+    styles: v.optional(v.object({
+      backgroundColor: v.optional(v.string()),
+      textColor: v.optional(v.string()),
+      fontSize: v.optional(v.string()),
+      fontFamily: v.optional(v.string()),
+      padding: v.optional(v.string()),
+      margin: v.optional(v.string()),
+      borderRadius: v.optional(v.string()),
+      borderColor: v.optional(v.string()),
+      borderWidth: v.optional(v.string())
+    })),
+    isPublic: v.optional(v.boolean()),
+    usageCount: v.optional(v.number()),
+    rating: v.optional(v.number()),
+    ratingCount: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number()
+  })
+    .index("by_user", ["userId"])
+    .index("by_category", ["category"])
+    .index("by_type", ["type"])
+    .index("by_public", ["isPublic"])
+    .index("by_tags", ["tags"])
+    .index("by_updated_at", ["updatedAt"]),
 });
