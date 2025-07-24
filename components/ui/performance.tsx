@@ -9,18 +9,31 @@ import { Button } from '@/components/ui/button';
 
 // Performance monitoring hook
 export function usePerformanceMonitor(componentName: string) {
+  const [renderTime, setRenderTime] = useState(0);
+  
   useEffect(() => {
     const startTime = performance.now();
     
     return () => {
       const endTime = performance.now();
-      const renderTime = endTime - startTime;
+      const renderTimeMs = endTime - startTime;
       
-      if (renderTime > 100) {
-        console.warn(`${componentName} took ${renderTime.toFixed(2)}ms to render`);
+      setRenderTime(renderTimeMs);
+      
+      if (renderTimeMs > 100) {
+        console.warn(`${componentName} took ${renderTimeMs.toFixed(2)}ms to render`);
+      }
+      
+      // Dispatch custom event for performance dashboard
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('component-render', {
+          detail: { componentName, renderTime: renderTimeMs }
+        }));
       }
     };
   }, [componentName]);
+  
+  return { renderTime };
 }
 
 // Lazy loading wrapper with fallback
