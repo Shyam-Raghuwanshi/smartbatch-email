@@ -135,7 +135,7 @@ export const processSpamComplaint = mutation({
     });
 
     // Add to suppression list immediately
-    await addToSuppressionList(
+    await addToSuppressionListInternal(
       ctx, 
       emailQueue.recipient, 
       emailQueue.userId, 
@@ -209,7 +209,7 @@ export const addToSuppressionList = mutation({
 
     if (!user) throw new Error("User not found");
 
-    return await addToSuppressionList(
+    return await addToSuppressionListInternal(
       ctx,
       args.email,
       user._id,
@@ -415,7 +415,7 @@ export const processUnsubscribeToken = mutation({
     }
 
     // Add to suppression list
-    await addToSuppressionList(
+    await addToSuppressionListInternal(
       ctx,
       emailQueue.recipient,
       emailQueue.userId,
@@ -580,7 +580,7 @@ async function handleHardBounce(
   bounceId: Id<"emailBounces">
 ): Promise<void> {
   // Immediately add to suppression list for hard bounces
-  await addToSuppressionList(ctx, email, userId, "bounce_hard", "Hard bounce received", true);
+  await addToSuppressionListInternal(ctx, email, userId, "bounce_hard", "Hard bounce received", true);
   
   // Update contact status
   const contact = await ctx.db
@@ -618,7 +618,7 @@ async function handleSoftBounce(
 
   // If more than 5 soft bounces, treat as permanent
   if (softBounces.length >= 5) {
-    await addToSuppressionList(
+    await addToSuppressionListInternal(
       ctx, 
       email, 
       userId, 
@@ -648,7 +648,7 @@ async function handleSoftBounce(
   }
 }
 
-async function addToSuppressionList(
+async function addToSuppressionListInternal(
   ctx: any,
   email: string,
   userId: Id<"users">,
