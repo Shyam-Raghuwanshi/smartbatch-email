@@ -28,7 +28,7 @@ interface Contact {
   tags: string[];
   isActive: boolean;
   createdAt: number;
-  updatedAt: number;
+  updatedAt?: number;
   source?: string;
   lastEngagement?: number;
   emailStats?: {

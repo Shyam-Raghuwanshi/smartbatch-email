@@ -40,6 +40,33 @@ interface ContactImportModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+// Helper function to automatically map columns based on common header names
+function autoMapColumns(columns: string[]): Record<string, string> {
+  const mapping: Record<string, string> = {};
+  
+  const fieldMappings = {
+    email: ["email", "e-mail", "email address", "mail", "emailaddress"],
+    firstName: ["first name", "firstname", "first_name", "fname", "given name"],
+    lastName: ["last name", "lastname", "last_name", "lname", "surname", "family name"],
+    phone: ["phone", "phone number", "phonenumber", "phone_number", "tel", "telephone", "mobile"],
+    company: ["company", "organization", "org", "business", "employer"],
+    position: ["position", "title", "job title", "jobtitle", "job_title", "role"],
+    tags: ["tags", "categories", "labels", "groups"]
+  };
+  
+  columns.forEach(column => {
+    const normalizedColumn = column.toLowerCase().trim();
+    
+    Object.entries(fieldMappings).forEach(([field, variants]) => {
+      if (variants.includes(normalizedColumn)) {
+        mapping[field] = column;
+      }
+    });
+  });
+  
+  return mapping;
+}
+
 export function ContactImportModal({ open, onOpenChange }: ContactImportModalProps) {
   const [activeTab, setActiveTab] = useState("csv");
   const [csvData, setCsvData] = useState<Record<string, string>[]>([]);
@@ -49,6 +76,7 @@ export function ContactImportModal({ open, onOpenChange }: ContactImportModalPro
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [step, setStep] = useState<"upload" | "mapping" | "preview" | "importing" | "result">("upload");
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const importContacts = useMutation(api.contacts_enhanced.importContacts);
 
@@ -66,19 +94,59 @@ export function ContactImportModal({ open, onOpenChange }: ContactImportModalPro
     const file = files[0];
     if (!file) return;
 
+    // Reset any previous errors
+    setUploadError(null);
+
+    // Validate file size (limit to 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      setUploadError("File size too large. Please upload a file smaller than 10MB.");
+      return;
+    }
+
     Papa.parse(file, {
       header: true,
+      skipEmptyLines: true,
+      transformHeader: (header) => header.trim(), // Clean up headers
       complete: (results) => {
-        setCsvData(results.data);
+        if (results.errors && results.errors.length > 0) {
+          console.error("CSV parsing errors:", results.errors);
+          const criticalErrors = results.errors.filter(error => error.type === "Delimiter");
+          if (criticalErrors.length > 0) {
+            setUploadError("Invalid CSV format. Please ensure your file is properly formatted with comma separators.");
+            return;
+          }
+        }
+        
+        // Filter out empty rows and ensure we have valid data
+        const validData = results.data.filter((row: any) => {
+          // Check if row has at least one non-empty value
+          return Object.values(row).some(value => value && String(value).trim() !== '');
+        }) as Record<string, string>[];
+        
+        if (validData.length === 0) {
+          setUploadError("No valid data found in the CSV file. Please ensure your file contains data rows with headers.");
+          return;
+        }
+
+        setCsvData(validData);
+        
+        // Auto-map columns based on common header names
+        if (validData.length > 0) {
+          const autoMapping = autoMapColumns(Object.keys(validData[0]));
+          setColumnMapping(autoMapping);
+        }
+        
         setStep("mapping");
       },
       error: (error) => {
         console.error("Error parsing CSV:", error);
+        setUploadError(`Failed to parse CSV file: ${error.message}`);
       },
     });
   }
 
-  const availableColumns = csvData.length > 0 ? Object.keys(csvData[0]) : [];
+  const availableColumns = csvData.length > 0 ? Object.keys(csvData[0]).filter(column => column && column.trim() !== '') : [];
   const contactFields = [
     { key: "email", label: "Email", required: true },
     { key: "firstName", label: "First Name", required: false },
@@ -150,6 +218,7 @@ export function ContactImportModal({ open, onOpenChange }: ContactImportModalPro
     setParsedContacts([]);
     setColumnMapping({});
     setImportResult(null);
+    setUploadError(null);
     setStep("upload");
   };
 
@@ -214,6 +283,18 @@ export function ContactImportModal({ open, onOpenChange }: ContactImportModalPro
                       <li>• Headers in the first row</li>
                     </ul>
                   </div>
+
+                  {uploadError && (
+                    <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <h4 className="font-medium text-red-800">Upload Error</h4>
+                          <p className="text-sm text-red-700 mt-1">{uploadError}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -227,26 +308,125 @@ export function ContactImportModal({ open, onOpenChange }: ContactImportModalPro
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {contactFields.map((field) => (
-                    <div key={field.key} className="flex items-center gap-4">
-                      <Label className="w-24 font-medium">
-                        {field.label}
-                        {field.required && <span className="text-destructive">*</span>}
-                      </Label>
-                      <select
-                        className="flex-1 h-10 px-3 py-2 border border-input bg-background rounded-md"
-                        value={columnMapping[field.key] || ""}
-                        onChange={(e) => handleColumnMapping(field.key, e.target.value)}
+                  {availableColumns.length === 0 ? (
+                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        No columns detected in your CSV file. Please ensure your CSV file has:
+                      </p>
+                      <ul className="text-sm text-yellow-800 mt-2 list-disc list-inside">
+                        <li>Headers in the first row</li>
+                        <li>At least one data row</li>
+                        <li>Proper CSV formatting</li>
+                      </ul>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setStep("upload")} 
+                        className="mt-3"
                       >
-                        <option value="">Select column...</option>
-                        {availableColumns.map((column) => (
-                          <option key={column} value={column}>
-                            {column}
-                          </option>
-                        ))}
-                      </select>
+                        Upload Different File
+                      </Button>
                     </div>
-                  ))}
+                  ) : (
+                    <>
+                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-blue-800">
+                          Found {availableColumns.length} columns: {availableColumns.join(", ")}
+                        </p>
+                        <p className="text-sm text-blue-800 mt-1">
+                          {csvData.length} rows of data detected
+                        </p>
+                        {Object.keys(columnMapping).length > 0 && (
+                          <p className="text-sm text-blue-800 mt-1">
+                            ✓ Auto-mapped {Object.keys(columnMapping).length} field{Object.keys(columnMapping).length !== 1 ? 's' : ''}
+                          </p>
+                        )}
+                      </div>
+                      
+                      <div className="flex gap-2 mb-4">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            const autoMapping = autoMapColumns(availableColumns);
+                            setColumnMapping(autoMapping);
+                          }}
+                        >
+                          Auto-Map Columns
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setColumnMapping({})}
+                        >
+                          Clear All Mappings
+                        </Button>
+                      </div>
+                      
+                      {contactFields.map((field) => (
+                        <div key={field.key} className="flex items-center gap-4">
+                          <Label className="w-24 font-medium">
+                            {field.label}
+                            {field.required && <span className="text-destructive">*</span>}
+                          </Label>
+                          <div className="flex-1 relative">
+                            <select
+                              className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md"
+                              value={columnMapping[field.key] || ""}
+                              onChange={(e) => handleColumnMapping(field.key, e.target.value)}
+                            >
+                              <option value="">Select column...</option>
+                              {availableColumns.map((column) => (
+                                <option key={column} value={column}>
+                                  {column}
+                                </option>
+                              ))}
+                            </select>
+                            {columnMapping[field.key] && (
+                              <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {csvData.length > 0 && (
+                        <div className="mt-6">
+                          <h4 className="font-medium mb-3">Sample Data Preview</h4>
+                          <div className="border rounded-lg overflow-hidden">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  {contactFields.filter(field => columnMapping[field.key]).map((field) => (
+                                    <TableHead key={field.key} className="text-xs">
+                                      {field.label}
+                                      <div className="text-xs text-muted-foreground">
+                                        ({columnMapping[field.key]})
+                                      </div>
+                                    </TableHead>
+                                  ))}
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {csvData.slice(0, 3).map((row, index) => (
+                                  <TableRow key={index}>
+                                    {contactFields.filter(field => columnMapping[field.key]).map((field) => (
+                                      <TableCell key={field.key} className="text-xs max-w-32 truncate">
+                                        {row[columnMapping[field.key]] || "—"}
+                                      </TableCell>
+                                    ))}
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Showing first 3 rows with mapped columns
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
 
                   <div className="flex items-center space-x-2 pt-4">
                     <Checkbox
@@ -265,10 +445,15 @@ export function ContactImportModal({ open, onOpenChange }: ContactImportModalPro
                     </Button>
                     <Button 
                       onClick={generatePreview}
-                      disabled={!columnMapping.email}
+                      disabled={!columnMapping.email || availableColumns.length === 0}
                     >
                       Preview Import
                     </Button>
+                    {!columnMapping.email && availableColumns.length > 0 && (
+                      <p className="text-sm text-muted-foreground self-center ml-2">
+                        Please map the Email field to continue
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>

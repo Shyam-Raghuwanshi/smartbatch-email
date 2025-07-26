@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useConvexAuth, AuthLoading, Authenticated, Unauthenticated } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
@@ -19,29 +19,10 @@ import { ContactsTable } from "./ContactsTable";
 import { ContactFilters } from "./ContactFilters";
 import { ContactStats } from "./ContactStats";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-
-interface Contact {
-  _id: Id<"contacts">;
-  email: string;
-  firstName?: string;
-  lastName?: string;
-  phone?: string;
-  company?: string;
-  position?: string;
-  tags: string[];
-  isActive: boolean;
-  createdAt: number;
-  updatedAt: number;
-  source?: string;
-  lastEngagement?: number;
-  emailStats?: {
-    totalSent: number;
-    totalOpened: number;
-    totalClicked: number;
-  };
-}
+import { LoadingCard, TableLoadingSkeleton } from "@/components/ui/loading";
 
 export function ContactsDashboard() {
+  const { isAuthenticated, isLoading } = useConvexAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
@@ -50,7 +31,7 @@ export function ContactsDashboard() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [showAddContactModal, setShowAddContactModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [selectedContact, setSelectedContact] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize] = useState(25);
 
@@ -85,7 +66,7 @@ export function ContactsDashboard() {
   }, []);
 
   const handleSelectAll = useCallback((selected: boolean) => {
-    setSelectedContacts(selected ? contacts.map(c => c._id) : []);
+    setSelectedContacts(selected ? contacts.map((c: any) => c._id) : []);
   }, [contacts]);
 
   const handleBulkDelete = useCallback(async () => {
@@ -108,12 +89,12 @@ export function ContactsDashboard() {
 
   const handleExportContacts = useCallback(() => {
     const contactsToExport = selectedContacts.length > 0 
-      ? contacts.filter(c => selectedContacts.includes(c._id))
+      ? contacts.filter((c: any) => selectedContacts.includes(c._id))
       : contacts;
 
     const csvData = [
       ["Email", "First Name", "Last Name", "Phone", "Company", "Position", "Tags", "Status", "Created At"],
-      ...contactsToExport.map(contact => [
+      ...contactsToExport.map((contact: any) => [
         contact.email,
         contact.firstName || "",
         contact.lastName || "",
@@ -126,7 +107,7 @@ export function ContactsDashboard() {
       ])
     ];
 
-    const csvContent = csvData.map(row => row.map(field => `"${field}"`).join(",")).join("\\n");
+    const csvContent = csvData.map(row => row.map((field: any) => `"${field}"`).join(",")).join("\\n");
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -143,34 +124,78 @@ export function ContactsDashboard() {
     setActiveFilter(undefined);
   }, []);
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Contacts</h1>
-          <p className="text-muted-foreground">
-            Manage your contact database and segments
-          </p>
+  // Show loading while auth is being determined
+  if (isLoading) {
+    return (
+      <AuthLoading>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Contacts</h1>
+              <p className="mt-1 text-sm text-gray-600">Loading...</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <LoadingCard key={i} />
+            ))}
+          </div>
+          <div className="mt-6">
+            <TableLoadingSkeleton />
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setShowImportModal(true)} variant="outline">
-            <Upload className="mr-2 h-4 w-4" />
-            Import
-          </Button>
-          <Button onClick={handleExportContacts} variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
-          <Button onClick={() => setShowAddContactModal(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Contact
-          </Button>
-        </div>
-      </div>
+      </AuthLoading>
+    );
+  }
 
-      {/* Stats Cards */}
-      {stats && <ContactStats stats={stats} />}
+  return (
+    <>
+      <Unauthenticated>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Contacts</h1>
+              <p className="mt-1 text-sm text-gray-600">Please sign in to continue</p>
+            </div>
+          </div>
+          <Card>
+            <CardContent className="p-6">
+              <p className="text-center text-gray-600">
+                You need to be signed in to view your contacts.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </Unauthenticated>
+
+      <Authenticated>
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Contacts</h1>
+              <p className="text-muted-foreground">
+                Manage your contact database and segments
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={() => setShowImportModal(true)} variant="outline">
+                <Upload className="mr-2 h-4 w-4" />
+                Import
+              </Button>
+              <Button onClick={handleExportContacts} variant="outline">
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+              <Button onClick={() => setShowAddContactModal(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Contact
+              </Button>
+            </div>
+          </div>
+
+          {/* Stats Cards */}
+          {stats && <ContactStats stats={stats} />}
 
       {/* Search and Filters */}
       <Card>
@@ -290,13 +315,17 @@ export function ContactsDashboard() {
       <ContactFormModal
         open={showAddContactModal}
         onOpenChange={setShowAddContactModal}
-      />        {selectedContact && (
+      />
+      
+      {selectedContact && (
         <ContactProfileModal
           contact={selectedContact}
           open={!!selectedContact}
           onOpenChange={(open: boolean) => !open && setSelectedContact(null)}
         />
       )}
-    </div>
+        </div>
+      </Authenticated>
+    </>
   );
 }
