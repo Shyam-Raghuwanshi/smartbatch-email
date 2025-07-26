@@ -59,7 +59,7 @@ export const runScheduledTasks = action({
   }
 });
 
-export const cleanupOldWebhookLogs = action({
+export const cleanupOldWebhookLogs = mutation({
   args: {
     before: v.number()
   },

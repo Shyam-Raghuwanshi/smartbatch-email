@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 // Create campaign
 export const createCampaign = mutation({
@@ -221,6 +222,15 @@ export const updateCampaign = mutation({
     }
 
     const { id, ...updates } = args;
+    
+    // If status is changing to "sending", we need to queue emails
+    if (updates.status === "sending" && campaign.status !== "sending") {
+      await ctx.runMutation(internal.campaigns.queueCampaignEmails, {
+        campaignId: id,
+        userId: user._id,
+      });
+    }
+    
     await ctx.db.patch(id, updates);
     return id;
   },
@@ -526,5 +536,105 @@ export const emergencyStopCampaign = mutation({
     }
     
     return { success: true, stoppedEmails: activeEmails.length };
+  },
+});
+
+// Internal function to queue emails when campaign starts
+export const queueCampaignEmails = internalMutation({
+  args: {
+    campaignId: v.id("campaigns"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const campaign = await ctx.db.get(args.campaignId);
+    if (!campaign || !campaign.settings) {
+      throw new Error("Campaign not found or missing settings");
+    }
+
+    // Get contacts matching the campaign's target tags
+    const contacts = await ctx.db
+      .query("contacts")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    // Filter contacts by target tags
+    const targetContacts = contacts.filter(contact => {
+      return campaign.settings!.targetTags.some(tag => 
+        contact.tags && contact.tags.includes(tag)
+      );
+    });
+
+    const emailQueueIds: string[] = [];
+    
+    for (const contact of targetContacts) {
+      // Check if contact is unsubscribed
+      const unsubscribe = await ctx.db
+        .query("unsubscribes")
+        .filter((q) => q.eq(q.field("email"), contact.email))
+        .filter((q) => q.eq(q.field("userId"), args.userId))
+        .first();
+
+      if (unsubscribe) continue;
+
+      // Generate unsubscribe token
+      const unsubscribeToken = crypto.randomUUID();
+      
+      let htmlContent = campaign.settings.customContent || "";
+      let textContent = campaign.settings.customContent || "";
+      let subject = campaign.settings.subject;
+
+      if (campaign.settings.templateId) {
+        const template = await ctx.db.get(campaign.settings.templateId);
+        if (template) {
+          htmlContent = template.content;
+          textContent = template.content;
+          subject = template.subject;
+        }
+      }
+
+      // Replace variables
+      const name = `${contact.firstName || ""} ${contact.lastName || ""}`.trim();
+      htmlContent = htmlContent.replace(/{name}/g, name);
+      textContent = textContent.replace(/{name}/g, name);
+      subject = subject.replace(/{name}/g, name);
+
+      const user = await ctx.db.get(args.userId);
+      if (!user) throw new Error("User not found");
+
+      const emailQueueId = await ctx.db.insert("emailQueue", {
+        userId: args.userId,
+        campaignId: args.campaignId,
+        recipient: contact.email,
+        subject,
+        htmlContent,
+        textContent,
+        fromEmail: user.email,
+        fromName: user.name,
+        status: "queued",
+        priority: 5,
+        scheduledAt: Date.now(),
+        attemptCount: 0,
+        maxAttempts: 3,
+        metadata: {
+          templateId: campaign.settings.templateId,
+          variables: {
+            name,
+            email: contact.email,
+            firstName: contact.firstName,
+            lastName: contact.lastName,
+          },
+          trackOpens: campaign.settings.trackOpens,
+          trackClicks: campaign.settings.trackClicks,
+          unsubscribeToken,
+        },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+
+      emailQueueIds.push(emailQueueId);
+    }
+
+    return { emailsQueued: emailQueueIds.length, skippedContacts: targetContacts.length - emailQueueIds.length };
   },
 });

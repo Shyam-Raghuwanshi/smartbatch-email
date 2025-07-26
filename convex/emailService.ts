@@ -203,9 +203,36 @@ export const sendEmail = mutation({
       // Manual template processing for now
       const template = await ctx.db.get(args.templateId);
       if (template) {
-        htmlContent = processTemplate(template.htmlContent || template.content, args.variables);
-        textContent = processTemplate(template.content, args.variables);
-        subject = processTemplate(template.subject, args.variables);
+        // Get contact information for personalization
+        const contact = await ctx.db
+          .query("contacts")
+          .filter((q) => q.eq(q.field("email"), args.recipient))
+          .first();
+
+        console.log("DEBUG: Template found:", template.subject);
+        console.log("DEBUG: Contact found:", contact);
+
+        const allVariables = {
+          ...args.variables,
+          email: args.recipient,
+          firstName: contact?.firstName || "",
+          lastName: contact?.lastName || "",
+          fullName: contact?.firstName && contact?.lastName 
+            ? `${contact.firstName} ${contact.lastName}`
+            : contact?.firstName || contact?.lastName || "",
+          company: contact?.company || "",
+          position: contact?.position || "",
+          ...contact?.customFields,
+        };
+
+        console.log("DEBUG: All variables:", allVariables);
+        console.log("DEBUG: Template content before processing:", template.htmlContent || template.content);
+
+        htmlContent = processTemplate(template.htmlContent || template.content, allVariables);
+        textContent = processTemplate(template.content, allVariables);
+        subject = processTemplate(template.subject, allVariables);
+
+        console.log("DEBUG: Processed content:", { subject, htmlContent: htmlContent.substring(0, 200) });
       }
     } else {
       // Manual template processing for non-template emails
@@ -356,46 +383,39 @@ export const sendBatchEmails = mutation({
         continue; // Skip unsubscribed emails
       }
 
-      // Process template using template processor
+      // Get contact for personalization
+      const contact = await ctx.db
+        .query("contacts")
+        .filter((q) => q.eq(q.field("email"), email.recipient))
+        .first();
+
+      // Build allVariables for template replacement
+      const allVariables = {
+        ...email.variables,
+        email: email.recipient,
+        firstName: contact?.firstName || "",
+        lastName: contact?.lastName || "",
+        fullName: contact?.firstName && contact?.lastName 
+          ? `${contact.firstName} ${contact.lastName}`
+          : contact?.firstName || contact?.lastName || "",
+        company: contact?.company || "",
+        position: contact?.position || "",
+        ...contact?.customFields,
+      };
+
+      // Use processTemplate for all variable replacement
       let { htmlContent, textContent, subject } = email;
-      
       if (args.templateId && email.variables) {
-        const processedTemplate = await ctx.runMutation(internal.templateProcessor.processEmailTemplate, {
-          templateId: args.templateId,
-          recipient: email.recipient,
-          variables: email.variables,
-          baseUrl: process.env.CONVEX_SITE_URL || "http://localhost:3000",
-        });
-        
-        htmlContent = processedTemplate.htmlContent;
-        textContent = processedTemplate.textContent;
-        subject = processedTemplate.subject;
-      } else {
-        // Manual template processing
-        const contact = await ctx.db
-          .query("contacts")
-          .filter((q) => q.eq(q.field("email"), email.recipient))
-          .first();
-
-        const allVariables = {
-          ...email.variables,
-          email: email.recipient,
-          firstName: contact?.firstName || "",
-          lastName: contact?.lastName || "",
-          fullName: contact?.firstName && contact?.lastName 
-            ? `${contact.firstName} ${contact.lastName}`
-            : contact?.firstName || contact?.lastName || "",
-          company: contact?.company || "",
-          position: contact?.position || "",
-          ...contact?.customFields,
-        };
-
-        for (const [key, value] of Object.entries(allVariables)) {
-          const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
-          htmlContent = htmlContent.replace(regex, String(value));
-          textContent = textContent?.replace(regex, String(value));
-          subject = subject.replace(regex, String(value));
+        const template = await ctx.db.get(args.templateId);
+        if (template) {
+          htmlContent = processTemplate(template.htmlContent || template.content || "", allVariables);
+          textContent = processTemplate(template.content || "", allVariables);
+          subject = processTemplate(template.subject || subject, allVariables);
         }
+      } else {
+        htmlContent = processTemplate(htmlContent || "", allVariables);
+        textContent = processTemplate(textContent || "", allVariables);
+        subject = processTemplate(subject || "", allVariables);
       }
 
       // Generate unsubscribe token
@@ -541,32 +561,37 @@ export const sendABTestCampaign = mutation({
         let htmlContent = customContent || "";
         let textContent = "";
 
+        // Build allVariables for template replacement
+        const allVariables = {
+          firstName: contact?.firstName || "",
+          lastName: contact?.lastName || "",
+          email: recipient,
+          fullName: contact?.firstName && contact?.lastName 
+            ? `${contact.firstName} ${contact.lastName}`
+            : contact?.firstName || recipient,
+          company: contact?.company || "",
+          position: contact?.position || "",
+          ...contact?.customFields,
+        };
+
         // Apply template if specified
         if (templateId) {
           const template = await ctx.db.get(templateId);
           if (template) {
-            const variables = {
-              firstName: contact?.firstName || "",
-              lastName: contact?.lastName || "",
-              email: recipient,
-              fullName: contact?.firstName && contact?.lastName 
-                ? `${contact.firstName} ${contact.lastName}`
-                : contact?.firstName || recipient,
-              company: contact?.company || "",
-            };
-
-            htmlContent = template.htmlContent || template.content || "";
-            textContent = template.content || "";
-
-            // Replace variables in content
-            for (const [key, value] of Object.entries(variables)) {
-              const regex = new RegExp(`{${key}}`, 'g');
-              htmlContent = htmlContent.replace(regex, String(value));
-              textContent = textContent.replace(regex, String(value));
-              subject = subject.replace(regex, String(value));
-            }
+            htmlContent = processTemplate(template.htmlContent || template.content || "", allVariables);
+            textContent = processTemplate(template.content || "", allVariables);
+            subject = processTemplate(subject, allVariables);
           }
+        } else {
+          htmlContent = processTemplate(htmlContent, allVariables);
+          textContent = processTemplate(textContent, allVariables);
+          subject = processTemplate(subject, allVariables);
         }
+
+        // Generate unsubscribe token
+        const unsubscribeToken = crypto.randomUUID();
+        const unsubscribeLink = `${process.env.CONVEX_SITE_URL}/unsubscribe?token=${unsubscribeToken}`;
+        htmlContent = injectUnsubscribeLink(htmlContent, unsubscribeLink);
 
         // Create email queue entry
         const emailQueueId = await ctx.db.insert("emailQueue", {
@@ -588,6 +613,7 @@ export const sendABTestCampaign = mutation({
             variantId: variant._id,
             trackOpens: true,
             trackClicks: true,
+            unsubscribeToken,
           },
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -672,10 +698,13 @@ export const processEmailQueue = internalMutation({
       });
 
       // Send email via Resend
+      // const fromEmail = emailQueue.fromEmail || "onboarding@resend.dev";
+      const fromEmail = "onboarding@resend.dev";
+      const fromName = emailQueue.fromName;
+      const fromAddress = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+      
       const emailId = await ctx.runMutation(resend.lib.sendEmail, {
-        from: emailQueue.fromName 
-          ? `${emailQueue.fromName} <${emailQueue.fromEmail}>`
-          : emailQueue.fromEmail,
+        from: fromAddress,
         to: emailQueue.recipient,
         subject: emailQueue.subject,
         html: emailQueue.htmlContent,
