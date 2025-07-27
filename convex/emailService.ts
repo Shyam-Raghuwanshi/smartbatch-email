@@ -148,6 +148,8 @@ export const sendEmail = mutation({
     trackClicks: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<string> => {
+    console.log("inside sendmail")
+
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new Error("Not authenticated");
@@ -336,6 +338,8 @@ export const sendBatchEmails = mutation({
     emailsQueued: number;
     emailsSkipped: number;
   }> => {
+    console.log("inside sendbatchemails")
+
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new Error("Not authenticated");
@@ -402,10 +406,12 @@ export const sendBatchEmails = mutation({
         position: contact?.position || "",
         ...contact?.customFields,
       };
-
+      console.log("DEBUG: All variables for email:", allVariables);
       // Use processTemplate for all variable replacement
       let { htmlContent, textContent, subject } = email;
       if (args.templateId && email.variables) {
+
+        console.log("variables-----", email.variables)
         const template = await ctx.db.get(args.templateId);
         if (template) {
           htmlContent = processTemplate(template.htmlContent || template.content || "", allVariables);
@@ -496,6 +502,7 @@ export const sendABTestCampaign = mutation({
     delayBetweenBatches: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    console.log("inside sendabtestcampaign")
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new Error("Not authenticated");
