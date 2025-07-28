@@ -14,26 +14,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
 } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreHorizontal, 
-  Play, 
-  Pause, 
-  Copy, 
-  Edit, 
-  Trash2, 
+import {
+  Plus,
+  Search,
+  Filter,
+  MoreHorizontal,
+  Play,
+  Pause,
+  Copy,
+  Edit,
+  Trash2,
   Calendar,
   Users,
   Mail,
@@ -52,46 +52,46 @@ import { CampaignDetailModal } from '@/components/campaigns/CampaignDetailModal'
 import { LoadingCard, TableLoadingSkeleton } from '@/components/ui/loading';
 import { toast } from 'sonner';
 import { AutomatedCampaigns } from '@/components/campaigns/AutomatedCampaigns';
-import { VisualWorkflowBuilder } from '@/components/campaigns/VisualWorkflowBuilder';
+import VisualWorkflowBuilder from '@/components/campaigns/VisualWorkflowBuilder';
 import { BehavioralTriggers } from '@/components/campaigns/BehavioralTriggers';
-import { AdvancedScheduling } from '@/components/campaigns/AdvancedScheduling';
-import { CampaignTemplates } from '@/components/campaigns/CampaignTemplates';
+import AdvancedScheduling from '@/components/campaigns/AdvancedScheduling';
+import CampaignTemplates from '@/components/campaigns/CampaignTemplates';
 
 type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'paused' | 'cancelled';
 
 const statusConfig = {
-  draft: { 
-    label: 'Draft', 
+  draft: {
+    label: 'Draft',
     color: 'bg-gray-100 text-gray-800 border-gray-200',
     icon: Edit,
     description: 'Campaign is being prepared'
   },
-  scheduled: { 
-    label: 'Scheduled', 
+  scheduled: {
+    label: 'Scheduled',
     color: 'bg-blue-100 text-blue-800 border-blue-200',
     icon: Clock,
     description: 'Campaign is scheduled to send'
   },
-  sending: { 
-    label: 'Sending', 
+  sending: {
+    label: 'Sending',
     color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
     icon: Send,
     description: 'Campaign is currently being sent'
   },
-  sent: { 
-    label: 'Sent', 
+  sent: {
+    label: 'Sent',
     color: 'bg-green-100 text-green-800 border-green-200',
     icon: CheckCircle2,
     description: 'Campaign has been sent successfully'
   },
-  paused: { 
-    label: 'Paused', 
+  paused: {
+    label: 'Paused',
     color: 'bg-orange-100 text-orange-800 border-orange-200',
     icon: Pause,
     description: 'Campaign sending is paused'
   },
-  cancelled: { 
-    label: 'Cancelled', 
+  cancelled: {
+    label: 'Cancelled',
     color: 'bg-red-100 text-red-800 border-red-200',
     icon: AlertCircle,
     description: 'Campaign has been cancelled'
@@ -184,7 +184,7 @@ export default function CampaignsPage() {
   // Filter campaigns based on search and status
   const filteredCampaigns = campaigns?.filter(campaign => {
     const matchesSearch = campaign.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         campaign.settings.subject.toLowerCase().includes(searchQuery.toLowerCase());
+      campaign.settings.subject.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || campaign.status === statusFilter;
     return matchesSearch && matchesStatus;
   }) || [];
@@ -266,7 +266,7 @@ export default function CampaignsPage() {
   const handleBulkStatusChange = async (newStatus: CampaignStatus) => {
     if (confirm(`Change status to "${newStatus}" for ${selectedCampaigns.size} selected campaigns?`)) {
       try {
-        const promises = Array.from(selectedCampaigns).map(id => 
+        const promises = Array.from(selectedCampaigns).map(id =>
           updateCampaign({ id, status: newStatus })
         );
         await Promise.all(promises);
@@ -336,9 +336,9 @@ export default function CampaignsPage() {
           </Card>
         </div>
       </Unauthenticated>
-      
+
       <Authenticated>
-        <CampaignsContent 
+        <CampaignsContent
           campaigns={campaigns}
           filteredCampaigns={filteredCampaigns}
           stats={stats}
@@ -375,11 +375,11 @@ export default function CampaignsPage() {
   );
 }
 
-function CampaignsContent({ 
-  campaigns, 
-  filteredCampaigns, 
-  stats, 
-  searchQuery, 
+function CampaignsContent({
+  campaigns,
+  filteredCampaigns,
+  stats,
+  searchQuery,
   setSearchQuery,
   statusFilter,
   setStatusFilter,
@@ -434,7 +434,7 @@ function CampaignsContent({
   const StatusBadge = ({ status }: { status: CampaignStatus }) => {
     const config = statusConfig[status];
     const Icon = config.icon;
-    
+
     return (
       <Badge variant="outline" className={`${config.color} flex items-center gap-1`}>
         <Icon className="h-3 w-3" />
@@ -476,19 +476,19 @@ function CampaignsContent({
         </div>
         <div className="flex items-center gap-3">
           {/* Monitoring Dashboard Link */}
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => window.open('/campaigns/monitoring', '_blank')}
             className="flex items-center gap-2"
           >
             <BarChart3 className="h-4 w-4" />
             Monitoring Dashboard
           </Button>
-          
+
           {/* Seed Sample Data Button - only show if no campaigns exist */}
           {filteredCampaigns.length === 0 && (
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleSeedSampleData}
               className="flex items-center gap-2"
             >
@@ -503,16 +503,16 @@ function CampaignsContent({
                 New Campaign
               </Button>
             </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create New Campaign</DialogTitle>
-              <DialogDescription>
-                Set up your email campaign with templates, recipients, and scheduling options.
-              </DialogDescription>
-            </DialogHeader>
-            <CampaignForm onSuccess={() => setIsNewCampaignOpen(false)} />
-          </DialogContent>
-        </Dialog>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Create New Campaign</DialogTitle>
+                <DialogDescription>
+                  Set up your email campaign with templates, recipients, and scheduling options.
+                </DialogDescription>
+              </DialogHeader>
+              <CampaignForm onSuccess={() => setIsNewCampaignOpen(false)} />
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -649,10 +649,10 @@ function CampaignsContent({
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={handleBulkDelete}
                     className="text-red-600 hover:text-red-700"
                   >
@@ -661,9 +661,9 @@ function CampaignsContent({
                   </Button>
                 </div>
               </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={clearSelection}
               >
                 Clear Selection
@@ -689,7 +689,7 @@ function CampaignsContent({
                 {campaigns.length === 0 ? 'No campaigns yet' : 'No campaigns match your filters'}
               </h3>
               <p className="text-gray-600 mb-6">
-                {campaigns.length === 0 
+                {campaigns.length === 0
                   ? 'Get started by creating your first email campaign.'
                   : 'Try adjusting your search or filter criteria.'
                 }
@@ -722,8 +722,8 @@ function CampaignsContent({
               </TableHeader>
               <TableBody>
                 {filteredCampaigns.map((campaign: any) => (
-                  <TableRow 
-                    key={campaign._id} 
+                  <TableRow
+                    key={campaign._id}
                     className={`cursor-pointer hover:bg-gray-50 ${selectedCampaigns.has(campaign._id) ? 'bg-blue-50' : ''}`}
                     onClick={() => setDetailCampaign(campaign._id)}
                   >
@@ -750,8 +750,8 @@ function CampaignsContent({
                       </div>
                     </TableCell>
                     <TableCell>
-                      <CampaignStats 
-                        campaignId={campaign._id} 
+                      <CampaignStats
+                        campaignId={campaign._id}
                         status={campaign.status}
                       />
                     </TableCell>
@@ -764,8 +764,8 @@ function CampaignsContent({
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             onClick={(e) => e.stopPropagation()}
                           >
@@ -841,7 +841,7 @@ function CampaignsContent({
                             Edit
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeleteCampaign(campaign._id);
@@ -872,9 +872,9 @@ function CampaignsContent({
                 Update your campaign settings and configuration.
               </DialogDescription>
             </DialogHeader>
-            <CampaignForm 
+            <CampaignForm
               campaignId={selectedCampaign}
-              onSuccess={() => setSelectedCampaign(null)} 
+              onSuccess={() => setSelectedCampaign(null)}
             />
           </DialogContent>
         </Dialog>
