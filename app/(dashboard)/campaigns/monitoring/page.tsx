@@ -39,8 +39,24 @@ function CampaignMonitoring() {
   );
   const [heatmapDays, setHeatmapDays] = useState(7);
   
-  // Get campaigns for selection
+  // Get campaigns with real-time updates
+  const userId = useQuery(api.lib.getUserId);
   const campaigns = useQuery(api.campaigns.getCampaignsByUser);
+  const campaignUpdates = useQuery(api.optimizedQueries.subscribeCampaignUpdates, userId ? {
+    userId: userId,
+  } : "skip");
+  
+  // Merge campaign updates
+  const mergedCampaigns = React.useMemo(() => {
+    if (!campaigns) return [];
+    if (!campaignUpdates) return campaigns;
+    
+    const updateMap = new Map(campaignUpdates.map(c => [c._id, c]));
+    return campaigns.map(campaign => {
+      const update = updateMap.get(campaign._id);
+      return update ? { ...campaign, ...update } : campaign;
+    });
+  }, [campaigns, campaignUpdates]);
   
   // Get alerts for all campaigns
   const alerts = useQuery(api.campaignMonitoring.getAlertTriggers, {});
@@ -51,11 +67,14 @@ function CampaignMonitoring() {
   const emergencyStopCampaign = useMutation(api.campaigns.emergencyStopCampaign);
   
   // Get active campaigns (sending or scheduled)
-  const activeCampaigns = campaigns?.filter((c: any) => 
-    c.status === 'sending' || c.status === 'scheduled' || c.status === 'paused'
-  ) || [];
+  const activeCampaigns = React.useMemo(() => 
+    mergedCampaigns.filter((c: any) => 
+      c.status === 'sending' || c.status === 'scheduled' || c.status === 'paused'
+    ),
+    [mergedCampaigns]
+  );
   
-  const selectedCampaign = campaignId ? campaigns?.find((c: any) => c._id === campaignId) : null;
+  const selectedCampaign = campaignId ? mergedCampaigns.find((c: any) => c._id === campaignId) : null;
   
   const handlePauseCampaign = async () => {
     if (!campaignId) return;

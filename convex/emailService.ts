@@ -66,8 +66,14 @@ export const handleEmailEvent = internalMutation({
 
     await ctx.db.patch(emailQueue._id, updateData);
 
-    // Update campaign analytics if this email is part of a campaign
+    // Update campaign analytics and status if this email is part of a campaign
     if (emailQueue.campaignId) {
+      // Update campaign status based on email queue state
+      await ctx.runMutation(internal.campaignTasks.updateCampaignStatus, {
+        campaignId: emailQueue.campaignId
+      });
+      
+      // Record analytics for this event
       await ctx.db.insert("analytics", {
         campaignId: emailQueue.campaignId,
         metric: args.event.type as any,
@@ -735,6 +741,13 @@ export const processEmailQueue = internalMutation({
         sentAt: Date.now(),
         updatedAt: Date.now(),
       });
+
+      // Update campaign status if this email is part of a campaign
+      if (emailQueue.campaignId) {
+        await ctx.runMutation(internal.campaignTasks.updateCampaignStatus, {
+          campaignId: emailQueue.campaignId
+        });
+      }
 
     } catch (error: any) {
       console.error("Failed to send email:", error);

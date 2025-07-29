@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useConvexAuth, Authenticated, Unauthenticated, AuthLoading } from 'convex/react';
 import { useUser } from '@clerk/nextjs';
 import { api } from '@/convex/_generated/api';
@@ -11,7 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -101,9 +100,28 @@ const statusConfig = {
 export default function CampaignsPage() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const { user, isLoaded: userLoaded } = useUser();
+  const userId = useQuery(api.lib.getUserId);
   const campaigns = useQuery(api.campaigns.getCampaignsByUser);
+  const campaignUpdates = useQuery(api.optimizedQueries.subscribeCampaignUpdates, userId ? {
+    userId: userId,
+  } : "skip");
   const testAuth = useQuery(api.test.testAuth);
   const testPublic = useQuery(api.test.testPublic);
+
+  // Merge real-time updates with campaign data
+  const mergedCampaigns = useMemo(() => {
+    if (!campaigns) return [];
+    if (!campaignUpdates) return campaigns;
+    
+    // Create a map of campaign IDs to their latest status
+    const updateMap = new Map(campaignUpdates.map(c => [c._id, c]));
+    
+    // Merge campaigns with their latest status
+    return campaigns.map(campaign => {
+      const update = updateMap.get(campaign._id);
+      return update ? { ...campaign, ...update } : campaign;
+    });
+  }, [campaigns, campaignUpdates]);
   const deleteCampaign = useMutation(api.campaigns.deleteCampaign);
   const updateCampaign = useMutation(api.campaigns.updateCampaign);
   const duplicateCampaign = useMutation(api.campaigns.duplicateCampaign);
@@ -182,21 +200,25 @@ export default function CampaignsPage() {
   }, [user, userLoaded, ensureUser]);
 
   // Filter campaigns based on search and status
-  const filteredCampaigns = campaigns?.filter(campaign => {
-    const matchesSearch = campaign.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      campaign.settings.subject.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || campaign.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  }) || [];
+  const filteredCampaigns = useMemo(() => {
+    return mergedCampaigns.filter((campaign:any) => {
+      const matchesSearch = campaign.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        campaign.settings.subject.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || campaign.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [mergedCampaigns, searchQuery, statusFilter]);
 
   // Calculate quick stats
-  const stats = campaigns?.reduce((acc, campaign) => {
-    acc.total++;
-    if (campaign.status === 'sent') acc.sent++;
-    if (campaign.status === 'sending') acc.sending++;
-    if (campaign.status === 'scheduled') acc.scheduled++;
-    return acc;
-  }, { total: 0, sent: 0, sending: 0, scheduled: 0 }) || { total: 0, sent: 0, sending: 0, scheduled: 0 };
+  const stats = useMemo(() => {
+    return mergedCampaigns.reduce((acc:any, campaign:any) => {
+      acc.total++;
+      if (campaign.status === 'sent') acc.sent++;
+      if (campaign.status === 'sending') acc.sending++;
+      if (campaign.status === 'scheduled') acc.scheduled++;
+      return acc;
+    }, { total: 0, sent: 0, sending: 0, scheduled: 0 });
+  }, [mergedCampaigns]);
 
   const handleStatusChange = async (campaignId: Id<"campaigns">, newStatus: CampaignStatus) => {
     try {
@@ -340,6 +362,7 @@ export default function CampaignsPage() {
       <Authenticated>
         <CampaignsContent
           campaigns={campaigns}
+          mergedCampaigns={mergedCampaigns}
           filteredCampaigns={filteredCampaigns}
           stats={stats}
           searchQuery={searchQuery}
@@ -366,6 +389,7 @@ export default function CampaignsPage() {
           handleSelectAll={handleSelectAll}
           toggleCampaignSelection={toggleCampaignSelection}
           selectAllCampaigns={selectAllCampaigns}
+          clearSelection={clearSelection}
           testAuth={testAuth}
           testPublic={testPublic}
           formatDate={formatDate}
@@ -377,6 +401,7 @@ export default function CampaignsPage() {
 
 function CampaignsContent({
   campaigns,
+  mergedCampaigns,
   filteredCampaigns,
   stats,
   searchQuery,
@@ -409,26 +434,36 @@ function CampaignsContent({
   formatDate
 }: {
   campaigns: any[];
-  isLoading: boolean;
+  mergedCampaigns: any[];
+  filteredCampaigns: any[];
+  stats: { total: number; sent: number; sending: number; scheduled: number };
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  statusFilter: CampaignStatus | 'all';
+  setStatusFilter: (status: CampaignStatus | 'all') => void;
+  selectedCampaigns: Set<Id<"campaigns">>;
+  setSelectedCampaigns: (campaigns: Set<Id<"campaigns">>) => void;
+  showBulkActions: boolean;
+  setShowBulkActions: (show: boolean) => void;
   isNewCampaignOpen: boolean;
   setIsNewCampaignOpen: (open: boolean) => void;
-  selectedCampaign: any;
-  setSelectedCampaign: (campaign: any) => void;
-  detailCampaign: any;
-  setDetailCampaign: (campaign: any) => void;
-  handleStatusChange: (id: string, status: string) => void;
-  handleDeleteCampaign: (id: string) => void;
+  selectedCampaign: Id<"campaigns"> | null;
+  setSelectedCampaign: (campaign: Id<"campaigns"> | null) => void;
+  detailCampaign: Id<"campaigns"> | null;
+  setDetailCampaign: (campaign: Id<"campaigns"> | null) => void;
+  handleStatusChange: (id: Id<"campaigns">, status: CampaignStatus) => void;
+  handleDeleteCampaign: (id: Id<"campaigns">) => void;
   handleDuplicateCampaign: (campaign: any) => void;
   handleSeedSampleData: () => void;
-  handleBulkStatusChange: (status: string) => void;
+  handleBulkStatusChange: (status: CampaignStatus) => void;
   handleBulkDelete: () => void;
-  handleCampaignSelect: (campaignId: string) => void;
-  handleSelectAll: () => void;
-  toggleCampaignSelection: (campaignId: string) => void;
-  selectAllCampaigns: () => void;
+  handleCampaignSelect: (campaignId: Id<"campaigns">, checked: boolean) => void;
+  handleSelectAll: (checked: boolean) => void;
+  toggleCampaignSelection: (campaignId: Id<"campaigns">) => void;
+  selectAllCampaigns: (checked: boolean) => void;
   clearSelection: () => void;
-  testAuth: () => void;
-  testPublic: () => void;
+  testAuth: any;
+  testPublic: any;
   formatDate: (timestamp: number) => string;
 }) {
   const StatusBadge = ({ status }: { status: CampaignStatus }) => {
@@ -686,7 +721,7 @@ function CampaignsContent({
             <div className="text-center py-12">
               <div className="text-4xl mb-4">📧</div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {campaigns.length === 0 ? 'No campaigns yet' : 'No campaigns match your filters'}
+                {mergedCampaigns.length === 0 ? 'No campaigns yet' : 'No campaigns match your filters'}
               </h3>
               <p className="text-gray-600 mb-6">
                 {campaigns.length === 0

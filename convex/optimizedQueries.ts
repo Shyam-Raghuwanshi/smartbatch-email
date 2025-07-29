@@ -323,24 +323,18 @@ export const subscribeCampaignUpdates = query({
     campaignIds: v.optional(v.array(v.id("campaigns")))
   },
   handler: async (ctx, args) => {
-    let query = ctx.db
+    const campaigns = await ctx.db
       .query("campaigns")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId));
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
     
+    // Filter campaigns if specific IDs are requested
     if (args.campaignIds) {
-      // For specific campaigns, we'll filter client-side
-      // In a real implementation, you might want a compound index
-      const campaigns = await query.collect();
       return campaigns.filter(c => args.campaignIds!.includes(c._id));
     }
     
-    // Return only active campaigns for real-time updates
-    return await ctx.db
-      .query("campaigns")
-      .withIndex("by_user_status", (q) => 
-        q.eq("userId", args.userId).eq("status", "sending")
-      )
-      .collect();
+    // Otherwise return all campaigns for real-time status tracking
+    return campaigns;
   }
 });
 

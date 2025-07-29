@@ -13,6 +13,7 @@ import type * as analytics from "../analytics.js";
 import type * as apiKeys from "../apiKeys.js";
 import type * as auditLogging from "../auditLogging.js";
 import type * as campaignMonitoring from "../campaignMonitoring.js";
+import type * as campaignTasks from "../campaignTasks.js";
 import type * as campaigns from "../campaigns.js";
 import type * as contact_segments from "../contact_segments.js";
 import type * as contacts from "../contacts.js";
@@ -87,6 +88,7 @@ declare const fullApi: ApiFromModules<{
   apiKeys: typeof apiKeys;
   auditLogging: typeof auditLogging;
   campaignMonitoring: typeof campaignMonitoring;
+  campaignTasks: typeof campaignTasks;
   campaigns: typeof campaigns;
   contact_segments: typeof contact_segments;
   contacts: typeof contacts;

@@ -2,13 +2,29 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
 // Helper to get current authenticated user
-export const getCurrentUser = query({
+export const getUserId = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       return null;
     }
     
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+      
+    return user?._id;
+  },
+});
+
+export const getCurrentUser = query({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return null;
+    }
+
     return await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
@@ -65,26 +81,26 @@ export const requireAuth = async (ctx: any) => {
   if (!identity) {
     throw new Error("Not authenticated");
   }
-  
+
   const user = await ctx.db
     .query("users")
     .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
     .unique();
-  
+
   if (!user) {
     throw new Error("User not found in database");
   }
-  
+
   return { identity, user };
 };
 
 // Helper function to verify user owns a resource
 export const verifyOwnership = async (ctx: any, resourceUserId: string) => {
   const { user } = await requireAuth(ctx);
-  
+
   if (user._id !== resourceUserId) {
     throw new Error("Unauthorized: You don't own this resource");
   }
-  
+
   return user;
 };
