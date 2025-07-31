@@ -81,10 +81,11 @@ export const syncHubSpotContacts = action({
 
     try {
       // Start sync process
-      const syncId = await ctx.runMutation(api.integrations.createSync, {
+      const syncId = await ctx.runMutation(api.integrations.startSync, {
         integrationId: args.integrationId,
-        type: `contacts_${direction}`,
-        status: "running"
+        type: `contacts_${direction}` as any,
+        direction: direction === "bidirectional" ? "bidirectional" : direction === "import" ? "inbound" : "outbound",
+        options: {},
       });
 
       if (direction === "import" || direction === "bidirectional") {
@@ -101,14 +102,16 @@ export const syncHubSpotContacts = action({
 
       // Update sync status
       await ctx.runMutation(api.integrations.updateSync, {
-        id: syncId,
-        status: results.errors.length > 0 ? "completed_with_errors" : "completed",
+        syncId: syncId,
+        status: results.errors.length > 0 ? "failed" : "completed",
         progress: 100,
-        results: {
+        data: {
           imported: results.imported,
           exported: results.exported,
-          errors: results.errors
-        }
+          errors: results.errors,
+          totalRecords: results.imported + results.exported,
+        },
+        completedAt: Date.now(),
       });
 
       // Update integration last sync

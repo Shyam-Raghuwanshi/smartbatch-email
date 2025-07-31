@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, action } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 
 // Google Sheets Integration Functions
@@ -10,7 +10,7 @@ export const syncContactsToSheets = action({
     integrationId: v.id("integrations"),
   },
   handler: async (ctx, { integrationId }) => {
-    const integration = await ctx.runQuery(api.integrations.getById, { integrationId });
+    const integration = await ctx.runQuery(internal.integrations.getByIdInternal, { integrationId });
     
     if (!integration || integration.type !== "google_sheets") {
       throw new Error("Invalid Google Sheets integration");
@@ -19,19 +19,22 @@ export const syncContactsToSheets = action({
     const { spreadsheetId, sheetName, columnMapping, accessToken } = integration.configuration;
     
     // Get all contacts
-    const contacts = await ctx.runQuery(api.contacts.list, {});
+    const contacts = await ctx.runQuery(api.contacts_enhanced.getContacts, {});
     
     // Start sync record
-    const syncId = await ctx.runMutation(api.integrations.createSync, {
+    const syncId = await ctx.runMutation(api.integrations.startSync, {
       integrationId,
-      syncType: "manual",
-      direction: "export",
-      status: "running",
+      type: "contacts_export",
+      direction: "outbound",
+      options: {
+        destinationId: spreadsheetId,
+        sheetName: sheetName || "Sheet1",
+      },
     });
 
     try {
       // Prepare data for Google Sheets
-      const sheetsData = contacts.map(contact => [
+      const sheetsData = contacts.map((contact:any) => [
         contact.email,
         contact.firstName || "",
         contact.lastName || "",
@@ -68,9 +71,12 @@ export const syncContactsToSheets = action({
       await ctx.runMutation(api.integrations.updateSync, {
         syncId,
         status: "completed",
-        recordsCreated: contacts.length,
-        recordsUpdated: 0,
-        recordsDeleted: 0,
+        data: {
+          recordsCreated: contacts.length,
+          recordsUpdated: 0,
+          recordsDeleted: 0,
+          totalRecords: contacts.length,
+        },
         completedAt: Date.now(),
       });
 
@@ -98,23 +104,36 @@ export const syncContactsFromSheets = action({
     integrationId: v.id("integrations"),
   },
   handler: async (ctx, { integrationId }) => {
-    const integration = await ctx.runQuery(api.integrations.getById, { integrationId });
+    console.log("syncContactsFromSheets called with integrationId:", integrationId);
+    
+    const integration = await ctx.runQuery(internal.integrations.getByIdInternal, { integrationId });
     
     if (!integration || integration.type !== "google_sheets") {
+      console.error("Invalid Google Sheets integration");
       throw new Error("Invalid Google Sheets integration");
     }
 
+    console.log("Integration found:", integration.name);
+
     const { spreadsheetId, sheetName, columnMapping, accessToken } = integration.configuration;
     
+    console.log("Configuration:", { spreadsheetId, sheetName, hasAccessToken: !!accessToken });
+    
     // Start sync record
-    const syncId = await ctx.runMutation(api.integrations.createSync, {
+    const syncId = await ctx.runMutation(api.integrations.startSync, {
       integrationId,
-      syncType: "manual",
-      direction: "import",
-      status: "running",
+      type: "contacts_import",
+      direction: "inbound",
+      options: {
+        sourceId: spreadsheetId,
+        sheetName: sheetName || "Sheet1",
+      },
     });
 
+    console.log("Sync started with ID:", syncId);
+
     try {
+      console.log("Fetching data from Google Sheets...");
       // Fetch data from Google Sheets
       const response = await fetch(
         `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName || "Sheet1"}!A:G`,
@@ -125,11 +144,14 @@ export const syncContactsFromSheets = action({
         }
       );
 
+      console.log("Google Sheets API response status:", response.status);
+
       if (!response.ok) {
         throw new Error(`Google Sheets API error: ${response.statusText}`);
       }
 
       const data = await response.json();
+      console.log("Fetched sheet data:", { rowCount: data.values?.length, firstRow: data.values?.[0] });
       const rows = data.values || [];
       
       if (rows.length === 0) {
@@ -139,24 +161,16 @@ export const syncContactsFromSheets = action({
       // Skip header row
       const dataRows = rows.slice(1);
       
-      let created = 0;
-      let updated = 0;
-      let errors = 0;
-
-      // Process each row
-      for (const row of dataRows) {
-        const [email, firstName, lastName, company, phone, tags] = row;
-        
-        if (!email || !email.includes("@")) {
-          errors++;
-          continue;
-        }
-
-        try {
-          // Check if contact exists
-          const existingContact = await ctx.runQuery(api.contacts.getByEmail, { email });
+      // Transform data to the format expected by importContacts
+      const contactsData = dataRows
+        .map((row:any) => {
+          const [email, firstName, lastName, company, phone, tags] = row;
           
-          const contactData = {
+          if (!email || !email.includes("@")) {
+            return null; // Skip invalid emails
+          }
+
+          return {
             email,
             firstName: firstName || undefined,
             lastName: lastName || undefined,
@@ -164,41 +178,36 @@ export const syncContactsFromSheets = action({
             phone: phone || undefined,
             tags: tags ? tags.split(",").map((t: string) => t.trim()).filter(Boolean) : [],
           };
+        })
+        .filter((contact:any): contact is NonNullable<typeof contact> => contact !== null); // Remove null entries with proper typing
 
-          if (existingContact) {
-            // Update existing contact
-            await ctx.runMutation(api.contacts.update, {
-              contactId: existingContact._id,
-              ...contactData,
-            });
-            updated++;
-          } else {
-            // Create new contact
-            await ctx.runMutation(api.contacts.create, contactData);
-            created++;
-          }
-        } catch (error) {
-          console.error(`Error processing contact ${email}:`, error);
-          errors++;
-        }
-      }
+      // Use the enhanced import function that handles duplicates properly
+      const importResult = await ctx.runMutation(api.contacts_enhanced.importContacts, {
+        contacts: contactsData,
+        fileName: `Google Sheets Import - ${sheetName || "Sheet1"}`,
+        skipDuplicates: false, // Update existing contacts instead of skipping
+      });
 
       // Update sync record with success
       await ctx.runMutation(api.integrations.updateSync, {
         syncId,
         status: "completed",
-        recordsCreated: created,
-        recordsUpdated: updated,
-        recordsDeleted: 0,
+        data: {
+          recordsCreated: importResult.successful,
+          recordsUpdated: 0, // The import function doesn't track updates vs creates
+          recordsDeleted: 0,
+          totalRecords: importResult.successful + importResult.failed + importResult.duplicatesSkipped,
+          errorCount: importResult.failed,
+        },
         completedAt: Date.now(),
       });
 
       return {
         success: true,
-        message: `Successfully processed ${created + updated} contacts from Google Sheets`,
-        created,
-        updated,
-        errors,
+        message: `Successfully processed ${importResult.successful} contacts from Google Sheets`,
+        created: importResult.successful,
+        updated: 0, // The enhanced import doesn't update existing contacts
+        errors: importResult.failed,
       };
     } catch (error) {
       // Update sync record with failure
@@ -219,7 +228,7 @@ export const bidirectionalSync = action({
     integrationId: v.id("integrations"),
   },
   handler: async (ctx, { integrationId }) => {
-    const integration = await ctx.runQuery(api.integrations.getById, { integrationId });
+    const integration = await ctx.runQuery(internal.integrations.getByIdInternal, { integrationId });
     
     if (!integration || integration.type !== "google_sheets") {
       throw new Error("Invalid Google Sheets integration");
@@ -228,17 +237,21 @@ export const bidirectionalSync = action({
     const { spreadsheetId, sheetName, accessToken } = integration.configuration;
     
     // Start sync record
-    const syncId = await ctx.runMutation(api.integrations.createSync, {
+    const syncId = await ctx.runMutation(api.integrations.startSync, {
       integrationId,
-      syncType: "scheduled",
+      type: "bidirectional_sync",
       direction: "bidirectional",
-      status: "running",
+      options: {
+        sourceId: spreadsheetId,
+        destinationId: spreadsheetId,
+        sheetName: sheetName || "Sheet1",
+      },
     });
 
     try {
       // First, get data from both sides
       const [localContacts, sheetsResponse] = await Promise.all([
-        ctx.runQuery(api.contacts.list, {}),
+        ctx.runQuery(api.contacts_enhanced.getContacts, {}),
         fetch(
           `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName || "Sheet1"}!A:H`,
           {
@@ -259,7 +272,7 @@ export const bidirectionalSync = action({
       
       // Create maps for comparison
       const localContactsMap = new Map(
-        localContacts.map(contact => [
+        localContacts.map((contact:any) => [
           contact.email.toLowerCase(),
           {
             ...contact,
@@ -269,7 +282,7 @@ export const bidirectionalSync = action({
       );
 
       const sheetsContactsMap = new Map();
-      sheetsContacts.forEach((row, index) => {
+      sheetsContacts.forEach((row:any, index:number) => {
         const [email, firstName, lastName, company, phone, tags, createdDate, lastModified] = row;
         if (email && email.includes("@")) {
           sheetsContactsMap.set(email.toLowerCase(), {
@@ -296,27 +309,35 @@ export const bidirectionalSync = action({
         const localContact = localContactsMap.get(email);
         
         if (!localContact) {
-          // Create new local contact
-          await ctx.runMutation(api.contacts.create, {
-            email: sheetsContact.email,
-            firstName: sheetsContact.firstName || undefined,
-            lastName: sheetsContact.lastName || undefined,
-            company: sheetsContact.company || undefined,
-            phone: sheetsContact.phone || undefined,
-            tags: sheetsContact.tags,
-          });
-          localCreated++;
+          // Create new local contact using enhanced API
+          try {
+            await ctx.runMutation(api.contacts_enhanced.createContact, {
+              email: sheetsContact.email,
+              firstName: sheetsContact.firstName || undefined,
+              lastName: sheetsContact.lastName || undefined,
+              company: sheetsContact.company || undefined,
+              phone: sheetsContact.phone || undefined,
+              tags: sheetsContact.tags,
+            });
+            localCreated++;
+          } catch (error) {
+            console.error(`Error creating contact ${email}:`, error);
+          }
         } else if (sheetsContact.lastModified > localContact.lastModified) {
           // Update local contact (Sheets version is newer)
-          await ctx.runMutation(api.contacts.update, {
-            contactId: localContact._id,
-            firstName: sheetsContact.firstName || undefined,
-            lastName: sheetsContact.lastName || undefined,
-            company: sheetsContact.company || undefined,
-            phone: sheetsContact.phone || undefined,
-            tags: sheetsContact.tags,
-          });
-          localUpdated++;
+          try {
+            await ctx.runMutation(api.contacts_enhanced.updateContact, {
+              contactId: localContact._id,
+              firstName: sheetsContact.firstName || undefined,
+              lastName: sheetsContact.lastName || undefined,
+              company: sheetsContact.company || undefined,
+              phone: sheetsContact.phone || undefined,
+              tags: sheetsContact.tags,
+            });
+            localUpdated++;
+          } catch (error) {
+            console.error(`Error updating contact ${email}:`, error);
+          }
         }
       }
 
@@ -356,10 +377,13 @@ export const bidirectionalSync = action({
         }
       }
 
+      // Filter updates for processing
+      const newRows = sheetsUpdates.filter(update => Array.isArray(update));
+      const rowUpdates = sheetsUpdates.filter(update => !Array.isArray(update));
+
       // Apply updates to Google Sheets
       if (sheetsUpdates.length > 0) {
         // Handle new rows (append)
-        const newRows = sheetsUpdates.filter(update => Array.isArray(update));
         if (newRows.length > 0) {
           await fetch(
             `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName || "Sheet1"}!A:H:append?valueInputOption=RAW`,
@@ -377,7 +401,6 @@ export const bidirectionalSync = action({
         }
 
         // Handle row updates
-        const rowUpdates = sheetsUpdates.filter(update => !Array.isArray(update));
         for (const update of rowUpdates) {
           await fetch(
             `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${update.range}?valueInputOption=RAW`,
@@ -399,9 +422,15 @@ export const bidirectionalSync = action({
       await ctx.runMutation(api.integrations.updateSync, {
         syncId,
         status: "completed",
-        recordsCreated: localCreated + newRows.length,
-        recordsUpdated: localUpdated + sheetsUpdated,
-        recordsDeleted: 0,
+        data: {
+          recordsCreated: localCreated + newRows.length,
+          recordsUpdated: localUpdated + sheetsUpdated,
+          recordsDeleted: 0,
+          totalRecords: localCreated + newRows.length + localUpdated + sheetsUpdated,
+          localCreated,
+          localUpdated,
+          sheetsUpdated,
+        },
         completedAt: Date.now(),
       });
 
@@ -429,37 +458,95 @@ export const bidirectionalSync = action({
 
 export const validateSheetsAccess = action({
   args: {
-    accessToken: v.string(),
-    spreadsheetId: v.string(),
+    integrationId: v.id("integrations"),
   },
-  handler: async (ctx, { accessToken, spreadsheetId }) => {
+  handler: async (ctx, { integrationId }) => {
     try {
-      const response = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`,
-        {
-          headers: {
-            "Authorization": `Bearer ${accessToken}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
+      const integration = await ctx.runQuery(internal.integrations.getByIdInternal, { integrationId });
+      
+      if (!integration || integration.type !== "google_sheets") {
         return {
           success: false,
-          message: `Unable to access spreadsheet: ${response.statusText}`,
+          message: "Invalid Google Sheets integration",
         };
       }
 
-      const spreadsheet = await response.json();
+      const { accessToken, spreadsheetId } = integration.configuration;
+
+      if (!accessToken) {
+        return {
+          success: false,
+          message: "No access token found for this integration",
+        };
+      }
+
+      // If no spreadsheet ID, we'll try to get user's first accessible spreadsheet
+      let targetSpreadsheetId = spreadsheetId;
+      let spreadsheetTitle = "";
+      let sheets: any[] = [];
+
+      if (!targetSpreadsheetId) {
+        // Get user's spreadsheets from Drive API
+        const driveResponse = await fetch(
+          `https://www.googleapis.com/drive/v3/files?q=mimeType='application/vnd.google-apps.spreadsheet'&pageSize=10`,
+          {
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+            },
+          }
+        );
+
+        if (driveResponse.ok) {
+          const driveData = await driveResponse.json();
+          if (driveData.files && driveData.files.length > 0) {
+            targetSpreadsheetId = driveData.files[0].id;
+            spreadsheetTitle = driveData.files[0].name;
+          }
+        }
+      }
+
+      if (targetSpreadsheetId) {
+        const response = await fetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${targetSpreadsheetId}`,
+          {
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          return {
+            success: false,
+            message: `Unable to access spreadsheet: ${response.statusText}`,
+          };
+        }
+
+        const spreadsheet = await response.json();
+        spreadsheetTitle = spreadsheet.properties?.title || spreadsheetTitle;
+        sheets = spreadsheet.sheets?.map((sheet: any) => ({
+          title: sheet.properties?.title,
+          sheetId: sheet.properties?.sheetId,
+        })) || [];
+
+        // Update integration with spreadsheet info if it wasn't set
+        if (!spreadsheetId) {
+          await ctx.runMutation(api.integrations.updateIntegration, {
+            integrationId,
+            configuration: {
+              ...integration.configuration,
+              spreadsheetId: targetSpreadsheetId,
+            },
+          });
+        }
+      }
       
       return {
         success: true,
         message: "Successfully connected to Google Sheets",
-        spreadsheetTitle: spreadsheet.properties?.title,
-        sheets: spreadsheet.sheets?.map((sheet: any) => ({
-          title: sheet.properties?.title,
-          sheetId: sheet.properties?.sheetId,
-        })) || [],
+        spreadsheetTitle,
+        sheets,
+        spreadsheetId: targetSpreadsheetId,
       };
     } catch (error) {
       return {
@@ -481,9 +568,10 @@ export const setupWebhookForSheets = mutation({
       integrationId,
       name: "Google Sheets Sync Trigger",
       url: webhookUrl,
-      events: ["contact.created", "contact.updated", "contact.deleted"],
+      events: ["contact_created", "contact_updated"],
       isActive: true,
       secret: Math.random().toString(36).substring(2, 15),
+      
     });
 
     return webhookId;
@@ -497,7 +585,7 @@ export const scheduledGoogleSheetsSync = action({
     // Get all active Google Sheets integrations
     const integrations = await ctx.runQuery(api.integrations.list);
     const googleSheetsIntegrations = integrations.filter(
-      integration => integration.type === "google_sheets" && integration.isActive
+      (integration:any) => integration.type === "google_sheets" && integration.isActive
     );
 
     const results = [];

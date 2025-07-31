@@ -706,7 +706,8 @@ export default defineSchema({
       v.literal("disconnected"),
       v.literal("error"),
       v.literal("pending"),
-      v.literal("configuring")
+      v.literal("configuring"),
+      v.literal("active")
     ),
     configuration: v.object({
       // OAuth credentials (encrypted)
@@ -723,6 +724,12 @@ export default defineSchema({
       spreadsheetId: v.optional(v.string()),
       sheetName: v.optional(v.string()),
       columnMapping: v.optional(v.record(v.string(), v.string())),
+      integrationId: v.optional(v.string()),
+      title: v.optional(v.string()),
+      sheets: v.optional(v.array(v.object({
+        sheetId: v.number(),
+        title: v.string(),
+      }))),
       // Zapier specific
       zapierHookUrl: v.optional(v.string()),
       // Custom fields
@@ -744,6 +751,7 @@ export default defineSchema({
       v.literal("unknown")
     ),
     errorMessage: v.optional(v.string()),
+    isActive: v.optional(v.boolean()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -793,6 +801,11 @@ export default defineSchema({
       successfulRecords: v.optional(v.number()),
       failedRecords: v.optional(v.number()),
       duplicatesSkipped: v.optional(v.number()),
+      // Integration-specific stats
+      recordsCreated: v.optional(v.number()),
+      recordsUpdated: v.optional(v.number()),
+      recordsDeleted: v.optional(v.number()),
+      errorCount: v.optional(v.number()),
       // Error tracking
       errors: v.optional(v.array(v.object({
         record: v.optional(v.string()),
@@ -1798,6 +1811,7 @@ export default defineSchema({
     resource: v.string(),
     resourceId: v.optional(v.string()),
     action: v.string(),
+    description: v.string(),
     details: v.any(),
     ipAddress: v.optional(v.string()),
     userAgent: v.optional(v.string()),

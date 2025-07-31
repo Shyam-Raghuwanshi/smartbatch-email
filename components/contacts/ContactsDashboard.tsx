@@ -18,7 +18,6 @@ import { BulkActionsBar } from "./BulkActionsBar";
 import { ContactsTable } from "./ContactsTable";
 import { ContactFilters } from "./ContactFilters";
 import { ContactStats } from "./ContactStats";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LoadingCard, TableLoadingSkeleton } from "@/components/ui/loading";
 
 export function ContactsDashboard() {
@@ -180,11 +179,11 @@ export function ContactsDashboard() {
             </div>
             <div className="flex gap-2">
               <Button onClick={() => setShowImportModal(true)} variant="outline">
-                <Upload className="mr-2 h-4 w-4" />
+                <Download className="h-4 w-4" />
                 Import
               </Button>
               <Button onClick={handleExportContacts} variant="outline">
-                <Download className="mr-2 h-4 w-4" />
+                <Upload className="h-4 w-4" />
                 Export
               </Button>
               <Button onClick={() => setShowAddContactModal(true)}>

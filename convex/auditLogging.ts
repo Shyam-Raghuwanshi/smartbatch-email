@@ -100,7 +100,7 @@ export const createAuditLog = mutation({
       eventType: args.eventType,
       userId: args.userId,
       integrationId: args.integrationId,
-      resourceType: args.resourceType,
+      resource: args.resourceType || "unknown",
       resourceId: args.resourceId,
       action: args.action,
       description: args.description,
@@ -110,7 +110,7 @@ export const createAuditLog = mutation({
       tags: args.tags || [],
       relatedEvents: args.relatedEvents || [],
       timestamp: Date.now(),
-      indexed: false
+      createdAt: Date.now()
     });
 
     // Create alert for high-risk events

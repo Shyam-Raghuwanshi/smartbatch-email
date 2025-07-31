@@ -22,11 +22,12 @@ export const getUserIntegrations = query({
     if (!user) throw new Error("User not found");
 
     // Log audit event
-    await ctx.scheduler.runAfter(0, internal.auditLogging.logEvent, {
+    await ctx.scheduler.runAfter(0, internal.auditLogging.createAuditLog, {
       userId: user._id,
       eventType: "integration_list_viewed",
-      resource: "integrations",
+      resourceType: "integrations",
       action: "Listed user integrations",
+      description: "Listed user integrations",
       details: { userClerkId: identity.subject },
       riskLevel: "low",
     });
@@ -48,6 +49,48 @@ export const getUserIntegrations = query({
         webhookSecret: integration.configuration.webhookSecret ? "***" : undefined,
       }
     }));
+  },
+});
+
+// Get a single integration by ID
+export const getById = query({
+  args: {
+    integrationId: v.id("integrations"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("clerkId", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) throw new Error("User not found");
+
+    const integration = await ctx.db.get(args.integrationId);
+    
+    if (!integration) {
+      throw new Error("Integration not found");
+    }
+
+    // Check if the integration belongs to the user
+    if (integration.userId !== user._id) {
+      throw new Error("Access denied");
+    }
+
+    // Return integration with sensitive data masked
+    return {
+      ...integration,
+      configuration: {
+        ...integration.configuration,
+        accessToken: integration.configuration.accessToken ? "***" : undefined,
+        refreshToken: integration.configuration.refreshToken ? "***" : undefined,
+        apiKey: integration.configuration.apiKey ? "***" : undefined,
+        apiSecret: integration.configuration.apiSecret ? "***" : undefined,
+        webhookSecret: integration.configuration.webhookSecret ? "***" : undefined,
+      }
+    };
   },
 });
 
@@ -100,13 +143,14 @@ export const createIntegration = mutation({
     });
 
     // Log audit event
-    await ctx.scheduler.runAfter(0, internal.auditLogging.logEvent, {
+    await ctx.scheduler.runAfter(0, internal.auditLogging.createAuditLog, {
       userId: user._id,
       integrationId,
       eventType: "integration_created",
-      resource: "integrations",
+      resourceType: "integrations",
       resourceId: integrationId,
       action: `Created ${args.type} integration: ${args.name}`,
+      description: `Created ${args.type} integration: ${args.name}`,
       details: {
         integrationType: args.type,
         integrationName: args.name,
@@ -131,7 +175,8 @@ export const updateIntegration = mutation({
       v.literal("disconnected"),
       v.literal("error"),
       v.literal("pending"),
-      v.literal("configuring")
+      v.literal("configuring"),
+      v.literal("active")
     )),
     permissions: v.optional(v.array(v.union(
       v.literal("read_contacts"),
@@ -140,6 +185,7 @@ export const updateIntegration = mutation({
       v.literal("read_analytics"),
       v.literal("webhook_events")
     ))),
+    isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -173,6 +219,10 @@ export const updateIntegration = mutation({
       updates.permissions = args.permissions;
     }
 
+    if (args.isActive !== undefined) {
+      updates.isActive = args.isActive;
+    }
+
     await ctx.db.patch(args.integrationId, updates);
 
     // Log audit event
@@ -180,14 +230,16 @@ export const updateIntegration = mutation({
     if (args.configuration) changes.push("configuration");
     if (args.status) changes.push("status");
     if (args.permissions) changes.push("permissions");
+    if (args.isActive !== undefined) changes.push("isActive");
 
-    await ctx.scheduler.runAfter(0, internal.auditLogging.logEvent, {
+    await ctx.scheduler.runAfter(0, internal.auditLogging.createAuditLog, {
       userId: user._id,
       integrationId: args.integrationId,
       eventType: "integration_updated",
-      resource: "integrations",
+      resourceType: "integrations",
       resourceId: args.integrationId,
       action: `Updated integration: ${integration.name}`,
+      description: `Updated integration: ${integration.name}`,
       details: {
         integrationName: integration.name,
         integrationType: integration.type,
@@ -196,6 +248,8 @@ export const updateIntegration = mutation({
         newStatus: args.status,
         configurationChanged: !!args.configuration,
         permissionsChanged: !!args.permissions,
+        isActiveChanged: args.isActive !== undefined,
+        newIsActive: args.isActive,
       },
       riskLevel: args.status === "disconnected" ? "high" : "medium",
       tags: ["integration_management", "configuration_change"],
@@ -408,8 +462,8 @@ export const startSync = mutation({
       throw new Error("Integration not found");
     }
 
-    if (integration.status !== "connected") {
-      throw new Error("Integration is not connected");
+    if (integration.status !== "connected" && integration.status !== "active") {
+      throw new Error("Integration is not connected or active");
     }
 
     const syncId = await ctx.db.insert("integrationSyncs", {
@@ -438,6 +492,77 @@ export const startSync = mutation({
     await ctx.scheduler.runAfter(0, "integrations:processSync", { syncId });
 
     return syncId;
+  },
+});
+
+// Update a sync operation
+export const updateSync = mutation({
+  args: {
+    syncId: v.id("integrationSyncs"),
+    status: v.optional(v.union(
+      v.literal("pending"),
+      v.literal("running"),
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("cancelled")
+    )),
+    progress: v.optional(v.number()),
+    data: v.optional(v.record(v.string(), v.any())),
+    error: v.optional(v.string()),
+    completedAt: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) throw new Error("User not found");
+
+    const sync = await ctx.db.get(args.syncId);
+    if (!sync || sync.userId !== user._id) {
+      throw new Error("Sync not found");
+    }
+
+    const updates: any = {
+      updatedAt: Date.now(),
+    };
+
+    if (args.status) {
+      updates.status = args.status;
+    }
+
+    if (args.progress !== undefined) {
+      updates.progress = args.progress;
+    }
+
+    if (args.data) {
+      updates.data = { ...sync.data, ...args.data };
+    }
+
+    if (args.error) {
+      updates.data = { 
+        ...sync.data, 
+        errors: [
+          ...(sync.data.errors || []),
+          {
+            error: args.error,
+            timestamp: Date.now(),
+          },
+        ],
+      };
+    }
+
+    if (args.completedAt) {
+      updates.completedAt = args.completedAt;
+    }
+
+    await ctx.db.patch(args.syncId, updates);
+
+    return args.syncId;
   },
 });
 
@@ -558,3 +683,20 @@ async function processBidirectionalSync(ctx: any, integration: any, sync: any): 
     failedRecords: 0,
   };
 }
+
+// Internal function to get integration with full sensitive data (for Actions)
+export const getByIdInternal = internalQuery({
+  args: {
+    integrationId: v.id("integrations"),
+  },
+  handler: async (ctx, args) => {
+    const integration = await ctx.db.get(args.integrationId);
+    
+    if (!integration) {
+      throw new Error("Integration not found");
+    }
+
+    // Return integration with full data (no masking) for internal use
+    return integration;
+  },
+});

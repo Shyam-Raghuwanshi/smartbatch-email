@@ -18,7 +18,7 @@ export const getContacts = query({
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .first();
+      .unique();
 
     if (!user) throw new Error("User not found");
 
@@ -479,7 +479,7 @@ export const getContactStats = query({
     const user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .first();
+      .unique();
 
     if (!user) throw new Error("User not found");
 
