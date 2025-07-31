@@ -193,11 +193,11 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
             emailsPerDay: 1000,
             respectTimeZones: true,
           },
-          ...(formData.scheduleType === 'scheduled' && formData.scheduledAt && {
-            scheduledTime: formData.scheduledAt.getTime(),
-          }),
           ...(formData.scheduleType === 'recurring' && formData.recurringPattern && {
-            recurringPattern: formData.recurringPattern,
+            recurring: {
+              pattern: formData.recurringPattern.type,
+              interval: formData.recurringPattern.interval,
+            },
           }),
         },
         settings: {
@@ -269,43 +269,7 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col overflow-hidden">
-          {/* Step Progress Indicator */}
-          <div className="mb-6 overflow-x-auto flex-shrink-0">
-            <div className="flex items-center justify-between min-w-max px-2">
-              {steps.map((step, index) => {
-                const isCompleted = index < currentStepIndex || (index === currentStepIndex && isStepValid(step));
-                const isCurrent = index === currentStepIndex;
-                
-                return (
-                  <div key={step} className="flex items-center flex-shrink-0">
-                    <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
-                      isCompleted 
-                        ? 'bg-green-500 border-green-500 text-white' 
-                        : isCurrent 
-                          ? 'border-blue-500 text-blue-500 bg-blue-50' 
-                          : 'border-gray-300 text-gray-400'
-                    }`}>
-                      {isCompleted && index < currentStepIndex ? (
-                        <CheckCircle2 className="h-4 w-4" />
-                      ) : (
-                        <span className="text-sm font-medium">{index + 1}</span>
-                      )}
-                    </div>
-                    <span className={`ml-2 text-sm font-medium whitespace-nowrap ${
-                      isCurrent ? 'text-blue-600' : isCompleted ? 'text-green-600' : 'text-gray-400'
-                    }`}>
-                      {stepNames[step as keyof typeof stepNames]}
-                    </span>
-                    {index < steps.length - 1 && (
-                      <div className={`mx-4 h-0.5 w-12 flex-shrink-0 ${
-                        index < currentStepIndex ? 'bg-green-500' : 'bg-gray-300'
-                      }`} />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+       
 
           <TabsList className="grid w-full grid-cols-5 mb-4 overflow-x-auto flex-shrink-0">
             {steps.map((step, index) => {
