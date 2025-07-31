@@ -75,6 +75,29 @@ export const createCampaign = mutation({
       ...args,
       createdAt: Date.now(),
     });
+    
+    // If campaign is scheduled, create a schedule entry
+    if (args.scheduledAt && args.status === "scheduled") {
+      // Get recipient count for this campaign
+      const contacts = await ctx.db
+        .query("contacts")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .collect();
+
+      const recipientCount = contacts.filter(contact => 
+        contact.tags?.some(tag => args.settings.targetTags.includes(tag))
+      ).length;
+
+      await ctx.db.insert("campaignSchedules", {
+        campaignId,
+        userId: args.userId,
+        scheduledAt: args.scheduledAt,
+        status: "pending",
+        recipientCount,
+        createdAt: Date.now(),
+      });
+    }
+    
     return campaignId;
   },
 });

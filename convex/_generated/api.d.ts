@@ -65,6 +65,7 @@ import type * as templateProcessor from "../templateProcessor.js";
 import type * as templates from "../templates.js";
 import type * as test from "../test.js";
 import type * as testFix from "../testFix.js";
+import type * as testSchedule from "../testSchedule.js";
 import type * as users from "../users.js";
 import type * as webhookSecurity from "../webhookSecurity.js";
 import type * as webhooks from "../webhooks.js";
@@ -143,6 +144,7 @@ declare const fullApi: ApiFromModules<{
   templates: typeof templates;
   test: typeof test;
   testFix: typeof testFix;
+  testSchedule: typeof testSchedule;
   users: typeof users;
   webhookSecurity: typeof webhookSecurity;
   webhooks: typeof webhooks;

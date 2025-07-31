@@ -97,7 +97,7 @@ export function ScheduleManagement({ onScheduleUpdate }: ScheduleManagementProps
   const [selectedSchedule, setSelectedSchedule] = useState<Id<"campaignSchedules"> | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  const scheduledCampaigns = useQuery(api.emailScheduler.getScheduledCampaigns, {
+  const scheduledCampaigns = useQuery(api.emailScheduler.getScheduleEntriesWithCampaigns, {
     status: statusFilter === "all" ? undefined : statusFilter,
   });
 

@@ -770,3 +770,185 @@ function mapDomainToISP(domain: string): string {
   
   return 'other';
 }
+
+/**
+ * Create a schedule entry for a campaign
+ */
+export const createCampaignSchedule = mutation({
+  args: {
+    campaignId: v.id("campaigns"),
+    scheduledAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Verify campaign exists and user owns it
+    const campaign = await ctx.db.get(args.campaignId);
+    if (!campaign || campaign.userId !== user._id) {
+      throw new Error("Campaign not found or unauthorized");
+    }
+
+    // Get recipient count for this campaign
+    const contacts = await ctx.db
+      .query("contacts")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    const recipientCount = contacts.filter(contact => 
+      contact.tags?.some(tag => campaign.settings.targetTags.includes(tag))
+    ).length;
+
+    // Create schedule entry
+    const scheduleId = await ctx.db.insert("campaignSchedules", {
+      campaignId: args.campaignId,
+      userId: user._id,
+      scheduledAt: args.scheduledAt,
+      status: "pending",
+      recipientCount,
+      createdAt: Date.now(),
+    });
+
+    return scheduleId;
+  },
+});
+
+/**
+ * Get schedule entries with campaign details - for the schedule management page
+ */
+export const getScheduleEntriesWithCampaigns = query({
+  args: {
+    status: v.optional(v.union(
+      v.literal("pending"),
+      v.literal("processed"),
+      v.literal("skipped"),
+      v.literal("failed")
+    )),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Get all schedule entries
+    let query = ctx.db
+      .query("campaignSchedules")
+      .withIndex("by_user", (q) => q.eq("userId", user._id));
+
+    if (args.status) {
+      query = query.filter((q) => q.eq(q.field("status"), args.status));
+    }
+
+    const schedules = await query
+      .order("desc")
+      .take(100);
+
+    // Get campaign details for each schedule
+    const schedulesWithCampaigns = await Promise.all(
+      schedules.map(async (schedule) => {
+        const campaign = await ctx.db.get(schedule.campaignId);
+        return {
+          ...schedule,
+          campaign,
+        };
+      })
+    );
+
+    return schedulesWithCampaigns;
+  },
+});
+
+/**
+ * Create schedule entries for campaigns that don't have them yet
+ */
+export const syncCampaignSchedules = mutation({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Get scheduled campaigns that don't have schedule entries yet
+    const scheduledCampaigns = await ctx.db
+      .query("campaigns")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .filter((q) => q.or(
+        q.eq(q.field("status"), "scheduled"),
+        q.and(
+          q.neq(q.field("scheduledAt"), undefined),
+          q.or(
+            q.eq(q.field("status"), "draft"),
+            q.eq(q.field("status"), "scheduled")
+          )
+        )
+      ))
+      .collect();
+
+    let created = 0;
+
+    // Create schedule entries for campaigns that don't have them
+    for (const campaign of scheduledCampaigns) {
+      if (campaign.scheduledAt) {
+        const existingSchedule = await ctx.db
+          .query("campaignSchedules")
+          .withIndex("by_campaign", (q) => q.eq("campaignId", campaign._id))
+          .first();
+
+        if (!existingSchedule) {
+          // Get recipient count
+          const contacts = await ctx.db
+            .query("contacts")
+            .withIndex("by_user", (q) => q.eq("userId", user._id))
+            .collect();
+
+          const recipientCount = contacts.filter(contact => 
+            contact.tags?.some(tag => campaign.settings.targetTags.includes(tag))
+          ).length;
+
+          await ctx.db.insert("campaignSchedules", {
+            campaignId: campaign._id,
+            userId: user._id,
+            scheduledAt: campaign.scheduledAt,
+            status: "pending",
+            recipientCount,
+            createdAt: Date.now(),
+          });
+          
+          created++;
+        }
+      }
+    }
+
+    return { created };
+  },
+});

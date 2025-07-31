@@ -181,7 +181,9 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
 
       const campaignData = {
         name: formData.name,
-        status: 'draft' as const,
+        status: (formData.scheduleType === 'scheduled' && formData.scheduledAt) 
+          ? 'scheduled' as const 
+          : 'draft' as const,
         scheduledAt: formData.scheduleType === 'scheduled' && formData.scheduledAt 
           ? formData.scheduledAt.getTime() 
           : undefined,
