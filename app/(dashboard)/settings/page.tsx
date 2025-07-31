@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,17 +9,27 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Settings, Globe, Clock, RefreshCw } from "lucide-react";
 import { IntegrationPollingSettings } from "@/components/settings/IntegrationPollingSettings";
+import { useSearchParams } from "next/navigation";
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState("general");
+  const searchParams = useSearchParams();
+  const initialTab = searchParams?.get("tab") || "general";
+  const [activeTab, setActiveTab] = useState(initialTab);
   
-  const apiIntegrations = useQuery(api.apiIntegrations.getUserApiIntegrations);
-  const googleIntegrations = useQuery(api.integrations.getUserIntegrations);
+  const integrations = useQuery(api.integrations.getUserIntegrations);
+  const pollingSettings = useQuery(api.integrationPolling.getUserPollingSettings);
   
-  const allIntegrations = [
-    ...(apiIntegrations || []),
-    ...(googleIntegrations?.filter(i => i.type === "google_sheets") || [])
-  ];
+  // Filter to show only integrations that support polling
+  const pollableIntegrations = integrations?.filter(i => 
+    i.type === "google_sheets" && i.status === "connected"
+  ) || [];
+
+  // Update tab when URL param changes
+  useEffect(() => {
+    if (initialTab && initialTab !== activeTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab, activeTab]);
 
   return (
     <div className="space-y-6">
@@ -68,9 +78,9 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {allIntegrations && allIntegrations.length > 0 ? (
+              {pollableIntegrations && pollableIntegrations.length > 0 ? (
                 <div className="space-y-4">
-                  {allIntegrations.map((integration) => (
+                  {pollableIntegrations.map((integration) => (
                     <IntegrationPollingSettings
                       key={integration._id}
                       integration={integration}
@@ -80,9 +90,9 @@ export default function SettingsPage() {
               ) : (
                 <div className="text-center py-8">
                   <Globe className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">No integrations found</h3>
+                  <h3 className="mt-2 text-sm font-medium text-gray-900">No connected integrations found</h3>
                   <p className="mt-1 text-sm text-gray-500">
-                    Create some integrations first to configure their polling settings.
+                    Connect Google Sheets integrations to enable automatic syncing.
                   </p>
                   <div className="mt-6">
                     <Button variant="outline">

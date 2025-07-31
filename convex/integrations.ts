@@ -215,6 +215,32 @@ export const updateIntegration = mutation({
 
     await ctx.db.patch(args.integrationId, updates);
 
+    // If status changed to "connected" and it's a Google Sheets integration, 
+    // create default polling settings
+    if (args.status === "connected" && integration.type === "google_sheets") {
+      // Check if polling settings already exist
+      const existingSettings = await ctx.db
+        .query("integrationPollingSettings")
+        .withIndex("by_integration", (q) => q.eq("integrationId", args.integrationId))
+        .unique();
+
+      if (!existingSettings) {
+        // Create default polling settings for Google Sheets (1 hour interval)
+        await ctx.db.insert("integrationPollingSettings", {
+          userId: user._id,
+          integrationId: args.integrationId,
+          enabled: true,
+          frequency: "hourly",
+          intervalMinutes: 60,
+          nextPollAt: Date.now() + (60 * 60 * 1000), // Next poll in 1 hour
+          retryCount: 0,
+          maxRetries: 3,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      }
+    }
+
     // Log audit event
     const changes = [];
     if (args.configuration) changes.push("configuration");

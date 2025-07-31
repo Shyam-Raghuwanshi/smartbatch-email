@@ -131,4 +131,12 @@ crons.interval(
   {}
 );
 
+// Integration polling - check for due syncs every 5 minutes
+crons.interval(
+  "integration-polling",
+  { minutes: 5 },
+  internal.integrationPolling.processPollingQueue,
+  {}
+);
+
 export default crons;

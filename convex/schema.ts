@@ -7,6 +7,7 @@ export default defineSchema({
     email: v.string(),
     name: v.string(),
     createdAt: v.number(),
+    tokenIdentifier: v.optional(v.string()), // Added for existing data compatibility
     subscription: v.object({
       plan: v.string(),
       status: v.string(),
@@ -770,10 +771,12 @@ export default defineSchema({
     integrationId: v.id("integrations"),
     enabled: v.boolean(),
     frequency: v.union(
+      v.literal("15min"),
+      v.literal("30min"),
       v.literal("hourly"),
       v.literal("daily"),
       v.literal("weekly"),
-      v.literal("monthly")
+      v.literal("custom")
     ),
     intervalMinutes: v.number(), // For custom intervals
     lastPolledAt: v.optional(v.number()),

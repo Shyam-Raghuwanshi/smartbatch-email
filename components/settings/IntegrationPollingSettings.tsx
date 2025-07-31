@@ -28,10 +28,14 @@ interface IntegrationPollingSettingsProps {
 export function IntegrationPollingSettings({ integration }: IntegrationPollingSettingsProps) {
   const [isUpdating, setIsUpdating] = useState(false);
 
-  const updatePollingSettings = useMutation(api.apiIntegrations.updatePollingSettings);
+  const updatePollingSettings = useMutation(api.integrationPolling.updatePollingSettings);
   const pollingSettings = useQuery(
-    api.apiIntegrations.getPollingSettings, 
+    api.integrationPolling.getPollingSettings, 
     { integrationId: integration._id }
+  );
+  const syncHistory = useQuery(
+    api.integrationPolling.getSyncHistory,
+    { integrationId: integration._id, limit: 5 }
   );
 
   const handleUpdateFrequency = async (frequency: string) => {
@@ -186,10 +190,11 @@ export function IntegrationPollingSettings({ integration }: IntegrationPollingSe
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="15min">Every 15 Minutes</SelectItem>
+                    <SelectItem value="30min">Every 30 Minutes</SelectItem>
                     <SelectItem value="hourly">Every Hour</SelectItem>
                     <SelectItem value="daily">Daily</SelectItem>
                     <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="monthly">Monthly</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -218,6 +223,34 @@ export function IntegrationPollingSettings({ integration }: IntegrationPollingSe
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <Clock className="h-4 w-4" />
                 <span>Automatic syncing is disabled. Data will only be fetched manually.</span>
+              </div>
+            </div>
+          )}
+
+          {/* Sync History */}
+          {syncHistory && syncHistory.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Recent Sync Activity</Label>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {syncHistory.map((sync) => (
+                  <div key={sync._id} className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded">
+                    <div className="flex items-center gap-2">
+                      {sync.status === "completed" ? (
+                        <CheckCircle className="h-3 w-3 text-green-500" />
+                      ) : sync.status === "failed" ? (
+                        <XCircle className="h-3 w-3 text-red-500" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3 text-blue-500 animate-spin" />
+                      )}
+                      <span>
+                        {sync.data.successfulRecords || 0} contacts synced
+                      </span>
+                    </div>
+                    <span className="text-gray-500">
+                      {new Date(sync.completedAt || sync.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           )}

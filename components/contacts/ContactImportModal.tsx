@@ -37,6 +37,11 @@ interface ImportResult {
   errors: string[];
 }
 
+interface ContactImportModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
 // Helper function to automatically map columns based on common header names
 function autoMapColumns(columns: string[]): Record<string, string> {
   const mapping: Record<string, string> = {};
@@ -64,7 +69,7 @@ function autoMapColumns(columns: string[]): Record<string, string> {
   return mapping;
 }
 
-export default function IntegrationsPage() {
+export default function ContactImportModal({ open, onOpenChange }: ContactImportModalProps) {
   const [currentTab, setCurrentTab] = useState<string>("csv");
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [importStatus, setImportStatus] = useState<string>("idle");
@@ -550,25 +555,21 @@ export default function IntegrationsPage() {
     setSelectedSheet("");
   };
 
+  const handleClose = () => {
+    resetImport();
+    onOpenChange(false);
+  };
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
-          Contact Import
-        </h2>
-        <p className="mt-2 text-sm text-gray-700">
-          Import contacts from various sources including CSV files, Google Sheets, and API integrations.
-        </p>
-      </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="csv">CSV Upload</TabsTrigger>
-          <TabsTrigger value="google">Google Sheets</TabsTrigger>
-          <TabsTrigger value="api">API Integration</TabsTrigger>
-          </TabsList>
+    <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <TabsList className="grid w-full grid-cols-3">
+        <TabsTrigger value="csv">CSV Upload</TabsTrigger>
+        <TabsTrigger value="google">Google Sheets</TabsTrigger>
+        <TabsTrigger value="api">API Integration</TabsTrigger>
+      </TabsList>
 
-        <TabsContent value="csv" className="space-y-4">
+      <TabsContent value="csv" className="space-y-4">
         {step === "upload" && (
           <Card>
             <CardHeader>
@@ -911,7 +912,7 @@ export default function IntegrationsPage() {
               )}
 
               <div className="flex gap-2">
-                <Button onClick={resetImport}>
+                <Button onClick={handleClose}>
                   Done
                 </Button>
                 <Button variant="outline" onClick={resetImport}>
@@ -921,9 +922,9 @@ export default function IntegrationsPage() {
             </CardContent>
           </Card>
         )}
-        </TabsContent>
+      </TabsContent>
 
-        <TabsContent value="google" className="space-y-4">
+      <TabsContent value="google" className="space-y-4">
         {googleStep === "connect" && (
           <Card>
             <CardHeader>
@@ -937,42 +938,17 @@ export default function IntegrationsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h4 className="font-medium text-blue-800 mb-2">What happens when you connect?</h4>
-                  <ul className="text-sm text-blue-700 space-y-1">
-                    <li>• Access your Google Sheets with read-only permissions</li>
-                    <li>• Browse and select sheets containing contact data</li>
-                    <li>• Preview and map columns before importing</li>
-                    <li>• Import contacts directly into your contact list</li>
-                  </ul>
-                </div>
-
                 <div className="text-center py-4">
                   <Button
                     onClick={() => handleConnectGoogleSheets()}
                     className="w-full max-w-sm"
-                    variant="default"
+                    variant="outline"
                     disabled={importStatus === "loading"}
                   >
                     <Globe className="mr-2 h-4 w-4" />
                     {importStatus === "loading" ? "Connecting..." : "Connect Google Account"}
                   </Button>
-                  {importStatus === "loading" && (
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Opening authentication window...
-                    </p>
-                  )}
                 </div>
-
-                <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                  <h4 className="font-medium text-gray-800 mb-2">Security & Privacy</h4>
-                  <ul className="text-sm text-gray-700 space-y-1">
-                    <li>• We only request read access to your Google Sheets</li>
-                    <li>• Your data is processed securely and not stored permanently</li>
-                    <li>• You can disconnect at any time</li>
-                  </ul>
-                </div>
-
                 {uploadError && (
                   <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
                     <div className="flex items-start gap-2">
@@ -980,14 +956,6 @@ export default function IntegrationsPage() {
                       <div>
                         <h4 className="font-medium text-red-800">Connection Error</h4>
                         <p className="text-sm text-red-700 mt-1">{uploadError}</p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setUploadError(null)}
-                          className="mt-2"
-                        >
-                          Try Again
-                        </Button>
                       </div>
                     </div>
                   </div>
@@ -1000,36 +968,20 @@ export default function IntegrationsPage() {
         {googleStep === "select" && sheetInfo && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-500" />
-                Google Sheets Connected
-              </CardTitle>
+              <CardTitle>Select Sheet</CardTitle>
               <CardDescription>
                 Choose the sheet containing your contacts
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {/* Connected Status */}
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <span className="text-sm font-medium text-green-800">
-                      Successfully connected to Google Sheets
-                    </span>
-                  </div>
-                  <p className="text-sm text-green-700 mt-1">
-                    You can now select sheets from your Google Drive to import contacts.
-                  </p>
-                </div>
-
                 <div>
-                  <Label>Connected Spreadsheet</Label>
+                  <Label>Selected Spreadsheet</Label>
                   <div className="flex items-center gap-2 mt-1">
                     <Input
                       value={sheetInfo.title || ""}
                       readOnly
-                      className="flex-1 bg-muted"
+                      className="flex-1"
                     />
                     <Button
                       variant="outline"
@@ -1039,13 +991,9 @@ export default function IntegrationsPage() {
                       Change
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {sheetInfo.sheets?.length || 0} sheet(s) available
-                  </p>
                 </div>
-
                 <div>
-                  <Label>Select Sheet to Import</Label>
+                  <Label>Sheet Name</Label>
                   <Select
                     value={selectedSheet}
                     onValueChange={(value) => {
@@ -1053,70 +1001,29 @@ export default function IntegrationsPage() {
                       if (value && sheetInfo?.sheets) {
                         const selectedSheetInfo = sheetInfo.sheets.find(s => s.title === value);
                         if (selectedSheetInfo) {
-                          setImportStatus("loading");
                           handleSheetSelect(selectedSheetInfo.title);
                         }
                       }
                     }}
-                    disabled={importStatus === "loading"}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a sheet to import from" />
+                      <SelectValue placeholder="Select a sheet" />
                     </SelectTrigger>
                     <SelectContent>
-                      {sheetInfo.sheets && sheetInfo.sheets.length > 0 ? (
-                        sheetInfo.sheets.map((sheet) => (
-                          <SelectItem key={sheet.sheetId} value={sheet.title}>
-                            <div className="flex items-center gap-2">
-                              <FileText className="h-4 w-4" />
-                              {sheet.title}
-                            </div>
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="" disabled>
-                          No sheets available
+                      {sheetInfo.sheets?.map((sheet) => (
+                        <SelectItem key={sheet.sheetId} value={sheet.title}>
+                          {sheet.title}
                         </SelectItem>
-                      )}
+                      ))}
                     </SelectContent>
                   </Select>
-                  {sheetInfo.sheets && sheetInfo.sheets.length > 0 && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Available sheets: {sheetInfo.sheets.map(s => s.title).join(", ")}
-                    </p>
-                  )}
                 </div>
-
                 {importStatus === "loading" && (
                   <div className="text-center py-4">
                     <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2" />
                     <p className="text-sm text-muted-foreground">Loading sheet data...</p>
                   </div>
                 )}
-
-                <div className="flex gap-2 pt-4">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      setSheetInfo(null);
-                      setSelectedSheet("");
-                      setSheetData([]);
-                      setParsedContacts([]);
-                      setColumnMapping({});
-                      setGoogleStep("connect");
-                      toast("Disconnected from Google Sheets", {
-                        description: "You can reconnect anytime to import contacts.",
-                      });
-                    }}
-                  >
-                    Disconnect
-                  </Button>
-                  {selectedSheet && (
-                    <Button variant="outline" onClick={() => handleSheetSelect(selectedSheet)}>
-                      Refresh Sheet Data
-                    </Button>
-                  )}
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -1126,24 +1033,15 @@ export default function IntegrationsPage() {
           <>
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Map Sheet Columns
-                </CardTitle>
+                <CardTitle>Map Columns</CardTitle>
                 <CardDescription>
-                  Match your Google Sheet columns to contact fields
+                  Match your sheet columns to contact fields
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {sheetData.length > 0 && (
                   <>
                     <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-center gap-2 mb-2">
-                        <CheckCircle className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm font-medium text-blue-800">
-                          Sheet "{selectedSheet}" loaded successfully
-                        </span>
-                      </div>
                       <p className="text-sm text-blue-800">
                         Found {Object.keys(sheetData[0]).length} columns: {Object.keys(sheetData[0]).join(", ")}
                       </p>
@@ -1276,27 +1174,12 @@ export default function IntegrationsPage() {
             {parsedContacts.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                    Preview Google Sheets Import
-                  </CardTitle>
+                  <CardTitle>Preview Contacts</CardTitle>
                   <CardDescription>
-                    Review {parsedContacts.length} contacts from "{selectedSheet}" before importing
+                    Review {parsedContacts.length} contacts before importing
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg mb-4">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <span className="text-sm font-medium text-green-800">
-                        Ready to import {parsedContacts.length} contacts from Google Sheets
-                      </span>
-                    </div>
-                    <p className="text-sm text-green-700 mt-1">
-                      Sheet: "{selectedSheet}" • Source: {sheetInfo?.title}
-                    </p>
-                  </div>
-
                   <div className="max-h-96 overflow-y-auto border rounded-md">
                     <Table>
                       <TableHeader>
@@ -1348,8 +1231,7 @@ export default function IntegrationsPage() {
                       Edit Mapping
                     </Button>
                     <Button onClick={handleImportFromSheets}>
-                      <Download className="mr-2 h-4 w-4" />
-                      Import {parsedContacts.length} Contacts from Google Sheets
+                      Import {parsedContacts.length} Contacts
                     </Button>
                   </div>
                 </CardContent>
@@ -1434,7 +1316,7 @@ export default function IntegrationsPage() {
               )}
 
               <div className="flex gap-2">
-                <Button onClick={resetImport}>
+                <Button onClick={handleClose}>
                   Done
                 </Button>
                 <Button variant="outline" onClick={resetImport}>
@@ -1444,12 +1326,11 @@ export default function IntegrationsPage() {
             </CardContent>
           </Card>
         )}
-        </TabsContent>
+      </TabsContent>
 
-        <TabsContent value="api" className="space-y-4">
-          <ApiIntegrationsTab />
-        </TabsContent>
-      </Tabs>
-    </div>
+      <TabsContent value="api" className="space-y-4">
+        <ApiIntegrationsTab />
+      </TabsContent>
+    </Tabs>
   );
 }

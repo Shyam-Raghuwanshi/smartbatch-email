@@ -40,6 +40,7 @@ import type * as http from "../http.js";
 import type * as hubspotIntegration from "../hubspotIntegration.js";
 import type * as integrationBackup from "../integrationBackup.js";
 import type * as integrationDocumentation from "../integrationDocumentation.js";
+import type * as integrationPolling from "../integrationPolling.js";
 import type * as integrationTesting from "../integrationTesting.js";
 import type * as integrationVersioning from "../integrationVersioning.js";
 import type * as integrations from "../integrations.js";
@@ -117,6 +118,7 @@ declare const fullApi: ApiFromModules<{
   hubspotIntegration: typeof hubspotIntegration;
   integrationBackup: typeof integrationBackup;
   integrationDocumentation: typeof integrationDocumentation;
+  integrationPolling: typeof integrationPolling;
   integrationTesting: typeof integrationTesting;
   integrationVersioning: typeof integrationVersioning;
   integrations: typeof integrations;
