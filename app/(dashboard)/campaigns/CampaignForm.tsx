@@ -259,72 +259,77 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
   const recipientCount = getContactsWithTags().length;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+    <div className="p-4 overflow-hidden flex flex-col">
+      <form onSubmit={handleSubmit} className="space-y-6 flex flex-col flex-1 overflow-hidden">
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        {/* Step Progress Indicator */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
-            {steps.map((step, index) => {
-              const isCompleted = index < currentStepIndex || (index === currentStepIndex && isStepValid(step));
-              const isCurrent = index === currentStepIndex;
-              
-              return (
-                <div key={step} className="flex items-center">
-                  <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
-                    isCompleted 
-                      ? 'bg-green-500 border-green-500 text-white' 
-                      : isCurrent 
-                        ? 'border-blue-500 text-blue-500 bg-blue-50' 
-                        : 'border-gray-300 text-gray-400'
-                  }`}>
-                    {isCompleted && index < currentStepIndex ? (
-                      <CheckCircle2 className="h-4 w-4" />
-                    ) : (
-                      <span className="text-sm font-medium">{index + 1}</span>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col overflow-hidden">
+          {/* Step Progress Indicator */}
+          <div className="mb-6 overflow-x-auto flex-shrink-0">
+            <div className="flex items-center justify-between min-w-max px-2">
+              {steps.map((step, index) => {
+                const isCompleted = index < currentStepIndex || (index === currentStepIndex && isStepValid(step));
+                const isCurrent = index === currentStepIndex;
+                
+                return (
+                  <div key={step} className="flex items-center flex-shrink-0">
+                    <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+                      isCompleted 
+                        ? 'bg-green-500 border-green-500 text-white' 
+                        : isCurrent 
+                          ? 'border-blue-500 text-blue-500 bg-blue-50' 
+                          : 'border-gray-300 text-gray-400'
+                    }`}>
+                      {isCompleted && index < currentStepIndex ? (
+                        <CheckCircle2 className="h-4 w-4" />
+                      ) : (
+                        <span className="text-sm font-medium">{index + 1}</span>
+                      )}
+                    </div>
+                    <span className={`ml-2 text-sm font-medium whitespace-nowrap ${
+                      isCurrent ? 'text-blue-600' : isCompleted ? 'text-green-600' : 'text-gray-400'
+                    }`}>
+                      {stepNames[step as keyof typeof stepNames]}
+                    </span>
+                    {index < steps.length - 1 && (
+                      <div className={`mx-4 h-0.5 w-12 flex-shrink-0 ${
+                        index < currentStepIndex ? 'bg-green-500' : 'bg-gray-300'
+                      }`} />
                     )}
                   </div>
-                  <span className={`ml-2 text-sm font-medium ${
-                    isCurrent ? 'text-blue-600' : isCompleted ? 'text-green-600' : 'text-gray-400'
-                  }`}>
+                );
+              })}
+            </div>
+          </div>
+
+          <TabsList className="grid w-full grid-cols-5 mb-4 overflow-x-auto flex-shrink-0">
+            {steps.map((step, index) => {
+              const isCompleted = index < currentStepIndex || (index === currentStepIndex && isStepValid(step));
+              
+              return (
+                <TabsTrigger 
+                  key={step}
+                  value={step} 
+                  className={`relative text-xs sm:text-sm px-2 sm:px-4 ${isCompleted ? 'text-green-600' : ''}`}
+                  disabled={index > currentStepIndex + 1}
+                >
+                  <span className="truncate">
                     {stepNames[step as keyof typeof stepNames]}
                   </span>
-                  {index < steps.length - 1 && (
-                    <div className={`mx-4 h-0.5 w-12 ${
-                      index < currentStepIndex ? 'bg-green-500' : 'bg-gray-300'
-                    }`} />
+                  {isCompleted && index < currentStepIndex && (
+                    <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 ml-1 text-green-500 flex-shrink-0" />
                   )}
-                </div>
+                </TabsTrigger>
               );
             })}
-          </div>
-        </div>
+          </TabsList>
 
-        <TabsList className="grid w-full grid-cols-5">
-          {steps.map((step, index) => {
-            const isCompleted = index < currentStepIndex || (index === currentStepIndex && isStepValid(step));
-            
-            return (
-              <TabsTrigger 
-                key={step}
-                value={step} 
-                className={`relative ${isCompleted ? 'text-green-600' : ''}`}
-                disabled={index > currentStepIndex + 1}
-              >
-                {stepNames[step as keyof typeof stepNames]}
-                {isCompleted && index < currentStepIndex && (
-                  <CheckCircle2 className="h-4 w-4 ml-1 text-green-500" />
-                )}
-              </TabsTrigger>
-            );
-          })}
-        </TabsList>
+          <div className="flex-1 overflow-y-auto">
 
         <TabsContent value="basic" className="space-y-4">
           <Card>
@@ -380,7 +385,7 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex items-center space-x-2">
                   <Switch
                     id="track-opens"
@@ -429,7 +434,7 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
             <CardContent className="space-y-4">
               <div>
                 <Label htmlFor="template">Email Template</Label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Select 
                     value={formData.templateId || 'custom'} 
                     onValueChange={(value) => setFormData(prev => ({ 
@@ -437,7 +442,7 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                       templateId: value === 'custom' ? undefined : value as Id<"templates">
                     }))}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="flex-1">
                       <SelectValue placeholder="Select a template or use custom content" />
                     </SelectTrigger>
                     <SelectContent>
@@ -453,6 +458,7 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                     type="button"
                     variant="outline"
                     onClick={() => window.open('/templates/editor', '_blank')}
+                    className="whitespace-nowrap"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     New Template
@@ -491,21 +497,21 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                     const selectedTemplate = templates?.find(t => t._id === formData.templateId);
                     return selectedTemplate ? (
                       <div className="space-y-2">
-                        <div className="text-sm">
+                        <div className="text-sm break-words">
                           <strong>Name:</strong> {selectedTemplate.name}
                         </div>
-                        <div className="text-sm">
+                        <div className="text-sm break-words">
                           <strong>Subject:</strong> {selectedTemplate.subject}
                         </div>
                         {selectedTemplate.description && (
-                          <div className="text-sm">
+                          <div className="text-sm break-words">
                             <strong>Description:</strong> {selectedTemplate.description}
                           </div>
                         )}
-                        <div className="flex gap-1 mt-2">
-                          <Badge variant="outline">{selectedTemplate.category}</Badge>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          <Badge variant="outline" className="text-xs">{selectedTemplate.category}</Badge>
                           {selectedTemplate.tags.slice(0, 3).map(tag => (
-                            <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
+                            <Badge key={tag} variant="secondary" className="text-xs break-all">{tag}</Badge>
                           ))}
                         </div>
                       </div>
@@ -538,16 +544,18 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
               )}
 
               {formData.templateId && templates && (
-                <div className="border rounded-lg p-4 bg-gray-50">
+                <div className="border rounded-lg p-4 bg-gray-50 overflow-hidden">
                   <h4 className="font-medium mb-2">Template Preview</h4>
                   {(() => {
                     const template = templates.find(t => t._id === formData.templateId);
                     return template ? (
                       <div className="text-sm text-gray-600">
-                        <p><strong>Subject:</strong> {template.subject}</p>
+                        <p className="break-words"><strong>Subject:</strong> {template.subject}</p>
                         <p className="mt-2"><strong>Content:</strong></p>
-                        <div className="mt-1 p-2 bg-white rounded border text-xs">
-                          {template.content.substring(0, 200)}...
+                        <div className="mt-1 p-2 bg-white rounded border text-xs overflow-hidden">
+                          <div className="break-words whitespace-pre-wrap">
+                            {template.content.substring(0, 200)}...
+                          </div>
                         </div>
                       </div>
                     ) : null;
@@ -584,7 +592,7 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
             <CardContent className="space-y-4">
               <div>
                 <Label>Add Target Tags</Label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Select value={newTag} onValueChange={setNewTag}>
                     <SelectTrigger className="flex-1">
                       <SelectValue placeholder="Select a tag..." />
@@ -599,22 +607,23 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                         ))}
                     </SelectContent>
                   </Select>
-                  <Button type="button" onClick={addTag} disabled={!newTag}>
-                    <Plus className="h-4 w-4" />
+                  <Button type="button" onClick={addTag} disabled={!newTag} className="sm:w-auto w-full">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Tag
                   </Button>
                 </div>
               </div>
 
               <div>
                 <Label>Selected Tags ({formData.targetTags.length})</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
+                <div className="flex flex-wrap gap-2 mt-2 max-h-32 overflow-y-auto">
                   {formData.targetTags.map((tag) => (
-                    <Badge key={tag} variant="secondary" className="flex items-center gap-1">
-                      {tag}
+                    <Badge key={tag} variant="secondary" className="flex items-center gap-1 text-xs break-all max-w-xs">
+                      <span className="truncate">{tag}</span>
                       <button
                         type="button"
                         onClick={() => removeTag(tag)}
-                        className="ml-1 hover:text-red-600"
+                        className="ml-1 hover:text-red-600 flex-shrink-0"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -792,7 +801,7 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                 </div>
 
                 {/* Email Content */}
-                <div className="prose prose-sm max-w-none">
+                <div className="prose prose-sm max-w-none overflow-hidden">
                   {(() => {
                     if (formData.templateId && templates) {
                       const template = templates.find(t => t._id === formData.templateId);
@@ -814,7 +823,7 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                         });
                         
                         return (
-                          <div className="whitespace-pre-wrap text-gray-900">
+                          <div className="whitespace-pre-wrap text-gray-900 break-words max-h-96 overflow-y-auto">
                             {content}
                           </div>
                         );
@@ -837,7 +846,7 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                       });
                       
                       return (
-                        <div className="whitespace-pre-wrap text-gray-900">
+                        <div className="whitespace-pre-wrap text-gray-900 break-words max-h-96 overflow-y-auto">
                           {content}
                         </div>
                       );
@@ -854,7 +863,7 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                 {/* Email Footer */}
                 <div className="border-t pt-4 mt-6 text-xs text-gray-500">
                   <p>This is a preview of your email campaign.</p>
-                  <p className="mt-1">
+                  <p className="mt-1 break-words">
                     Recipients: {recipientCount} contact{recipientCount !== 1 ? 's' : ''} 
                     {formData.targetTags.length > 0 && (
                       <> with tag{formData.targetTags.length !== 1 ? 's' : ''}: {formData.targetTags.join(', ')}</>
@@ -866,14 +875,14 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
               {/* Preview Settings */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <h4 className="font-medium text-gray-900 mb-3">Campaign Settings Summary</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-gray-600">Campaign Name:</span>
-                    <p className="font-medium">{formData.name || 'Untitled Campaign'}</p>
+                    <p className="font-medium break-words">{formData.name || 'Untitled Campaign'}</p>
                   </div>
                   <div>
                     <span className="text-gray-600">Send Schedule:</span>
-                    <p className="font-medium">
+                    <p className="font-medium break-words">
                       {formData.scheduleType === 'immediate' ? 'Send Immediately' : 
                        formData.scheduleType === 'scheduled' && formData.scheduledAt ? 
                        `Scheduled for ${formData.scheduledAt.toLocaleString()}` : 
@@ -883,11 +892,11 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                   </div>
                   <div>
                     <span className="text-gray-600">Rate Limiting:</span>
-                    <p className="font-medium">{formData.sendDelay || 5} seconds between emails</p>
+                    <p className="font-medium break-words">{formData.sendDelay || 5} seconds between emails</p>
                   </div>
                   <div>
                     <span className="text-gray-600">Tracking:</span>
-                    <p className="font-medium">
+                    <p className="font-medium break-words">
                       Opens: {formData.trackOpens ? 'Enabled' : 'Disabled'}, 
                       Clicks: {formData.trackClicks ? 'Enabled' : 'Disabled'}
                     </p>
@@ -897,74 +906,77 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
             </CardContent>
           </Card>
         </TabsContent>
+          </div>
       </Tabs>
 
-      <div className="flex justify-between items-center pt-6 border-t">
-        <Button type="button" variant="outline" onClick={onSuccess}>
-          Cancel
-        </Button>
-        
-        <div className="flex gap-3">
-          {/* Previous Button */}
-          {currentStepIndex > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={prevStep}
-            >
-              Previous
-            </Button>
-          )}
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6 border-t flex-shrink-0">
+          <Button type="button" variant="outline" onClick={onSuccess} className="w-full sm:w-auto">
+            Cancel
+          </Button>
           
-          {/* Next Button */}
-          {currentStepIndex < steps.length - 1 && (
-            <Button
-              type="button"
-              onClick={nextStep}
-              disabled={!canProceedToNext}
-              className="min-w-[120px]"
-            >
-              {canProceedToNext ? 'Next' : (
-                (() => {
-                  switch (activeTab) {
-                    case 'basic':
-                      return !formData.name.trim() ? 'Add Name' : 'Add Subject';
-                    case 'content':
-                      return 'Add Content';
-                    case 'recipients':
-                      return 'Select Tags';
-                    case 'schedule':
-                      return 'Set Schedule';
-                    default:
-                      return 'Next';
-                  }
-                })()
-              )}
-            </Button>
-          )}
-          
-          {/* Create/Update Button - Only show on last step */}
-          {currentStepIndex === steps.length - 1 && (
-            <Button
-              type="submit"
-              disabled={isSubmitting || !formData.name || !formData.subject || formData.targetTags.length === 0}
-              className="min-w-[140px]"
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  {campaignId ? 'Updating...' : 'Creating...'}
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  {campaignId ? 'Update Campaign' : 'Create Campaign'}
-                </>
-              )}
-            </Button>
-          )}
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            {/* Previous Button */}
+            {currentStepIndex > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={prevStep}
+                className="w-full sm:w-auto"
+              >
+                Previous
+              </Button>
+            )}
+            
+            {/* Next Button */}
+            {currentStepIndex < steps.length - 1 && (
+              <Button
+                type="button"
+                onClick={nextStep}
+                disabled={!canProceedToNext}
+                className="min-w-[120px] w-full sm:w-auto"
+              >
+                {canProceedToNext ? 'Next' : (
+                  (() => {
+                    switch (activeTab) {
+                      case 'basic':
+                        return !formData.name.trim() ? 'Add Name' : 'Add Subject';
+                      case 'content':
+                        return 'Add Content';
+                      case 'recipients':
+                        return 'Select Tags';
+                      case 'schedule':
+                        return 'Set Schedule';
+                      default:
+                        return 'Next';
+                    }
+                  })()
+                )}
+              </Button>
+            )}
+            
+            {/* Create/Update Button - Only show on last step */}
+            {currentStepIndex === steps.length - 1 && (
+              <Button
+                type="submit"
+                disabled={isSubmitting || !formData.name || !formData.subject || formData.targetTags.length === 0}
+                className="min-w-[140px] w-full sm:w-auto"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    {campaignId ? 'Updating...' : 'Creating...'}
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    {campaignId ? 'Update Campaign' : 'Create Campaign'}
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
-    </form>
+      </form>
+    </div>
   );
 }

@@ -538,7 +538,7 @@ function CampaignsContent({
                 New Campaign
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl overflow-y-auto">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create New Campaign</DialogTitle>
                 <DialogDescription>
