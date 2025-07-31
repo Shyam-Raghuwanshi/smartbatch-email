@@ -6,12 +6,9 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Filter, Upload, Download, Plus, UserPlus, Tags, Building, Trash2, MoreHorizontal } from "lucide-react";
-import { ContactImportModal } from "./ContactImportModal";
 import { ContactFormModal } from "./ContactFormModal";
 import { ContactProfileModal } from "./ContactProfileModal";
 import { BulkActionsBar } from "./BulkActionsBar";
@@ -19,6 +16,7 @@ import { ContactsTable } from "./ContactsTable";
 import { ContactFilters } from "./ContactFilters";
 import { ContactStats } from "./ContactStats";
 import { LoadingCard, TableLoadingSkeleton } from "@/components/ui/loading";
+import Link from "next/link";
 
 export function ContactsDashboard() {
   const { isAuthenticated, isLoading } = useConvexAuth();
@@ -57,8 +55,8 @@ export function ContactsDashboard() {
   const hasMore = contactsData?.hasMore || false;
 
   const handleSelectContact = useCallback((contactId: Id<"contacts">, selected: boolean) => {
-    setSelectedContacts(prev => 
-      selected 
+    setSelectedContacts(prev =>
+      selected
         ? [...prev, contactId]
         : prev.filter(id => id !== contactId)
     );
@@ -87,7 +85,7 @@ export function ContactsDashboard() {
   }, [selectedContacts, bulkUpdateTags]);
 
   const handleExportContacts = useCallback(() => {
-    const contactsToExport = selectedContacts.length > 0 
+    const contactsToExport = selectedContacts.length > 0
       ? contacts.filter((c: any) => selectedContacts.includes(c._id))
       : contacts;
 
@@ -178,10 +176,12 @@ export function ContactsDashboard() {
               </p>
             </div>
             <div className="flex gap-2">
-              <Button onClick={() => setShowImportModal(true)} variant="outline">
-                <Download className="h-4 w-4" />
-                Import
-              </Button>
+              <Link href="/integrations">
+                <Button variant="outline">
+                  <Download className="h-4 w-4" />
+                  Import
+                </Button>
+              </Link>
               <Button onClick={handleExportContacts} variant="outline">
                 <Upload className="h-4 w-4" />
                 Export
@@ -196,133 +196,127 @@ export function ContactsDashboard() {
           {/* Stats Cards */}
           {stats && <ContactStats stats={stats} />}
 
-      {/* Search and Filters */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            {/* Search */}
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search contacts by name, email, or company..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
+          {/* Search and Filters */}
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center">
+                {/* Search */}
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search contacts by name, email, or company..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
 
-            {/* Quick Filters */}
-            <div className="flex gap-2">
-              <Select value={activeFilter?.toString() || "all"} onValueChange={(value) => 
-                setActiveFilter(value === "all" ? undefined : value === "true")
-              }>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="true">Active</SelectItem>
-                  <SelectItem value="false">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
+                {/* Quick Filters */}
+                <div className="flex gap-2">
+                  <Select value={activeFilter?.toString() || "all"} onValueChange={(value) =>
+                    setActiveFilter(value === "all" ? undefined : value === "true")
+                  }>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="true">Active</SelectItem>
+                      <SelectItem value="false">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
 
-              <Button
-                variant={showFilters ? "default" : "outline"}
-                size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <Filter className="mr-2 h-4 w-4" />
-                Filters
-              </Button>
+                  <Button
+                    variant={showFilters ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowFilters(!showFilters)}
+                  >
+                    <Filter className="mr-2 h-4 w-4" />
+                    Filters
+                  </Button>
 
-              {(searchTerm || selectedTags.length > 0 || selectedCompanies.length > 0 || activeFilter !== undefined) && (
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  Clear
-                </Button>
+                  {(searchTerm || selectedTags.length > 0 || selectedCompanies.length > 0 || activeFilter !== undefined) && (
+                    <Button variant="ghost" size="sm" onClick={clearFilters}>
+                      Clear
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Advanced Filters */}
+              {showFilters && (
+                <ContactFilters
+                  selectedTags={selectedTags}
+                  selectedCompanies={selectedCompanies}
+                  availableTags={tags || []}
+                  availableCompanies={companies || []}
+                  onTagsChange={setSelectedTags}
+                  onCompaniesChange={setSelectedCompanies}
+                />
               )}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          {/* Advanced Filters */}
-          {showFilters && (
-            <ContactFilters
-              selectedTags={selectedTags}
-              selectedCompanies={selectedCompanies}
+          {/* Bulk Actions Bar */}
+          {selectedContacts.length > 0 && (
+            <BulkActionsBar
+              selectedCount={selectedContacts.length}
+              onDelete={handleBulkDelete}
+              onTagUpdate={handleBulkTagUpdate}
+              onExport={handleExportContacts}
               availableTags={tags || []}
-              availableCompanies={companies || []}
-              onTagsChange={setSelectedTags}
-              onCompaniesChange={setSelectedCompanies}
             />
           )}
-        </CardContent>
-      </Card>
 
-      {/* Bulk Actions Bar */}
-      {selectedContacts.length > 0 && (
-        <BulkActionsBar
-          selectedCount={selectedContacts.length}
-          onDelete={handleBulkDelete}
-          onTagUpdate={handleBulkTagUpdate}
-          onExport={handleExportContacts}
-          availableTags={tags || []}
-        />
-      )}
+          {/* Contacts Table */}
+          <ContactsTable
+            contacts={contacts}
+            selectedContacts={selectedContacts}
+            onSelectContact={handleSelectContact}
+            onSelectAll={handleSelectAll}
+            onContactClick={setSelectedContact}
+            loading={contactsData === undefined}
+          />
 
-      {/* Contacts Table */}
-      <ContactsTable
-        contacts={contacts}
-        selectedContacts={selectedContacts}
-        onSelectContact={handleSelectContact}
-        onSelectAll={handleSelectAll}
-        onContactClick={setSelectedContact}
-        loading={contactsData === undefined}
-      />
+          {/* Pagination */}
+          {totalContacts > pageSize && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Showing {currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, totalContacts)} of {totalContacts} contacts
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                  disabled={currentPage === 0}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => p + 1)}
+                  disabled={!hasMore}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
 
-      {/* Pagination */}
-      {totalContacts > pageSize && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing {currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, totalContacts)} of {totalContacts} contacts
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
-              disabled={currentPage === 0}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(p => p + 1)}
-              disabled={!hasMore}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
+          <ContactFormModal
+            open={showAddContactModal}
+            onOpenChange={setShowAddContactModal}
+          />
 
-      {/* Modals */}
-      <ContactImportModal
-        open={showImportModal}
-        onOpenChange={setShowImportModal}
-      />
-
-      <ContactFormModal
-        open={showAddContactModal}
-        onOpenChange={setShowAddContactModal}
-      />
-      
-      {selectedContact && (
-        <ContactProfileModal
-          contact={selectedContact}
-          open={!!selectedContact}
-          onOpenChange={(open: boolean) => !open && setSelectedContact(null)}
-        />
-      )}
+          {selectedContact && (
+            <ContactProfileModal
+              contact={selectedContact}
+              open={!!selectedContact}
+              onOpenChange={(open: boolean) => !open && setSelectedContact(null)}
+            />
+          )}
         </div>
       </Authenticated>
     </>
