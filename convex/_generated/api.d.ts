@@ -10,6 +10,8 @@
 
 import type * as abTesting from "../abTesting.js";
 import type * as analytics from "../analytics.js";
+import type * as apiCrons from "../apiCrons.js";
+import type * as apiIntegrations from "../apiIntegrations.js";
 import type * as apiKeys from "../apiKeys.js";
 import type * as auditLogging from "../auditLogging.js";
 import type * as campaignMonitoring from "../campaignMonitoring.js";
@@ -85,6 +87,8 @@ import type {
 declare const fullApi: ApiFromModules<{
   abTesting: typeof abTesting;
   analytics: typeof analytics;
+  apiCrons: typeof apiCrons;
+  apiIntegrations: typeof apiIntegrations;
   apiKeys: typeof apiKeys;
   auditLogging: typeof auditLogging;
   campaignMonitoring: typeof campaignMonitoring;

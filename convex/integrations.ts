@@ -21,17 +21,6 @@ export const getUserIntegrations = query({
 
     if (!user) throw new Error("User not found");
 
-    // Log audit event
-    await ctx.scheduler.runAfter(0, internal.auditLogging.createAuditLog, {
-      userId: user._id,
-      eventType: "integration_list_viewed",
-      resourceType: "integrations",
-      action: "Listed user integrations",
-      description: "Listed user integrations",
-      details: { userClerkId: identity.subject },
-      riskLevel: "low",
-    });
-
     const integrations = await ctx.db
       .query("integrations")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
@@ -63,7 +52,7 @@ export const getById = query({
 
     const user = await ctx.db
       .query("users")
-      .withIndex("clerkId", (q) => q.eq("clerkId", identity.subject))
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .unique();
 
     if (!user) throw new Error("User not found");
@@ -105,6 +94,7 @@ export const createIntegration = mutation({
       v.literal("hubspot"),
       v.literal("mailchimp"),
       v.literal("api_key"),
+      v.literal("api_endpoint"),
       v.literal("custom")
     ),
     name: v.string(),
@@ -402,7 +392,7 @@ export const getIntegrationSyncs = query({
     let query = ctx.db.query("integrationSyncs").withIndex("by_user", (q) => q.eq("userId", user._id));
 
     if (args.integrationId) {
-      query = ctx.db.query("integrationSyncs").withIndex("by_integration", (q) => q.eq("integrationId", args.integrationId));
+      query = ctx.db.query("integrationSyncs").withIndex("by_integration", (q) => q.eq("integrationId", args.integrationId!));
     }
 
     const syncs = await query
@@ -489,7 +479,7 @@ export const startSync = mutation({
     });
 
     // Schedule the sync to be processed
-    await ctx.scheduler.runAfter(0, "integrations:processSync", { syncId });
+    await ctx.scheduler.runAfter(0, internal.integrations.processSync, { syncId });
 
     return syncId;
   },
@@ -698,5 +688,40 @@ export const getByIdInternal = internalQuery({
 
     // Return integration with full data (no masking) for internal use
     return integration;
+  },
+});
+
+// Internal function to update integration status
+export const updateIntegrationStatus = internalMutation({
+  args: {
+    integrationId: v.id("integrations"),
+    status: v.optional(v.union(
+      v.literal("connected"),
+      v.literal("disconnected"),
+      v.literal("error"),
+      v.literal("pending"),
+      v.literal("configuring"),
+      v.literal("active")
+    )),
+    healthStatus: v.optional(v.union(
+      v.literal("healthy"),
+      v.literal("warning"),
+      v.literal("error"),
+      v.literal("unknown")
+    )),
+    errorMessage: v.optional(v.string()),
+    lastSyncAt: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const updates: any = {
+      updatedAt: Date.now(),
+    };
+
+    if (args.status !== undefined) updates.status = args.status;
+    if (args.healthStatus !== undefined) updates.healthStatus = args.healthStatus;
+    if (args.errorMessage !== undefined) updates.errorMessage = args.errorMessage;
+    if (args.lastSyncAt !== undefined) updates.lastSyncAt = args.lastSyncAt;
+
+    await ctx.db.patch(args.integrationId, updates);
   },
 });

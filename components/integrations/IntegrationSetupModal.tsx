@@ -123,6 +123,23 @@ const integrationConfigs = {
       "Test authentication",
       "Verify connection"
     ]
+  },
+  api_endpoint: {
+    name: "External API",
+    icon: "🌐",
+    description: "Connect to external APIs to import contacts automatically",
+    requiresOAuth: false,
+    fields: [
+      { key: "apiEndpoint", label: "API Endpoint URL", type: "url", required: true },
+      { key: "apiKey", label: "API Key", type: "password", required: true },
+    ],
+    permissions: ["read_contacts"],
+    steps: [
+      "Enter API endpoint details",
+      "Configure authentication",
+      "Test connection",
+      "Preview data"
+    ]
   }
 };
 

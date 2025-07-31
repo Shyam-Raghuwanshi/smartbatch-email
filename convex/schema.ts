@@ -697,6 +697,7 @@ export default defineSchema({
       v.literal("hubspot"),
       v.literal("mailchimp"),
       v.literal("api_key"),
+      v.literal("api_endpoint"),
       v.literal("custom")
     ),
     name: v.string(),
@@ -732,6 +733,9 @@ export default defineSchema({
       }))),
       // Zapier specific
       zapierHookUrl: v.optional(v.string()),
+      // API endpoint specific
+      apiEndpoint: v.optional(v.string()),
+      headers: v.optional(v.record(v.string(), v.string())),
       // Custom fields
       customConfig: v.optional(v.record(v.string(), v.any())),
     }),
@@ -760,6 +764,30 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_health", ["healthStatus"])
     .index("by_created_at", ["createdAt"]),
+
+  integrationPollingSettings: defineTable({
+    userId: v.id("users"),
+    integrationId: v.id("integrations"),
+    enabled: v.boolean(),
+    frequency: v.union(
+      v.literal("hourly"),
+      v.literal("daily"),
+      v.literal("weekly"),
+      v.literal("monthly")
+    ),
+    intervalMinutes: v.number(), // For custom intervals
+    lastPolledAt: v.optional(v.number()),
+    nextPollAt: v.optional(v.number()),
+    timezone: v.optional(v.string()),
+    retryCount: v.optional(v.number()),
+    maxRetries: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_integration", ["integrationId"])
+    .index("by_next_poll", ["nextPollAt"])
+    .index("by_enabled", ["enabled"]),
 
   integrationSyncs: defineTable({
     userId: v.id("users"),

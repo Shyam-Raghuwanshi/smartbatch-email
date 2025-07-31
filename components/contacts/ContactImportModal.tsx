@@ -18,7 +18,8 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Upload, FileText, Download, AlertCircle, CheckCircle, XCircle, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner"
+import { toast } from "sonner";
+import { ApiIntegrationsTab } from "./ApiIntegrationsTab";
 
 interface ParsedContact {
   email: string;
@@ -1337,39 +1338,7 @@ export function ContactImportModal({ open, onOpenChange }: ContactImportModalPro
           </TabsContent>
 
           <TabsContent value="api" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>API Integration</CardTitle>
-                <CardDescription>
-                  Use our API to import contacts programmatically
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <Label>API Endpoint</Label>
-                    <Input
-                      value="https://api.smartbatch.com/v1/contacts/import"
-                      readOnly
-                      className="font-mono text-sm"
-                    />
-                  </div>
-                  <div>
-                    <Label>API Key</Label>
-                    <Input
-                      value="sk_test_123456789"
-                      readOnly
-                      type="password"
-                      className="font-mono text-sm"
-                    />
-                  </div>
-                  <Button variant="outline">
-                    <Download className="mr-2 h-4 w-4" />
-                    Download API Documentation
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <ApiIntegrationsTab />
           </TabsContent>
         </Tabs>
       </DialogContent>

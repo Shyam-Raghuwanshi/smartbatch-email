@@ -45,6 +45,7 @@ import { IntegrationAnalytics } from "@/components/integrations/IntegrationAnaly
 import { IntegrationTesting } from "@/components/integrations/IntegrationTesting";
 import { IntegrationMarketplace } from "@/components/integrations/IntegrationMarketplace";
 import AuditLogs from "@/components/integrations/AuditLogs";
+import { ApiIntegrationsTab } from "@/components/contacts/ApiIntegrationsTab";
 
 export default function IntegrationsPage() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -168,6 +169,14 @@ export default function IntegrationsPage() {
       category: "Developer",
       features: ["Full API access", "Rate limiting", "Webhooks"],
     },
+    {
+      type: "api_endpoint",
+      name: "API Integration",
+      description: "Connect to external APIs to import contacts automatically",
+      icon: <Globe className="h-8 w-8 text-green-600" />,
+      category: "Data Import",
+      features: ["Scheduled polling", "Custom headers", "Data preview"],
+    },
   ];
 
   const connectedIntegrations = integrations?.filter(i => i.status === "connected") || [];
@@ -245,8 +254,9 @@ export default function IntegrationsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-11">
+        <TabsList className="grid w-full grid-cols-12">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="api-integrations">API Integrations</TabsTrigger>
           <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
           <TabsTrigger value="api-keys">API Keys</TabsTrigger>
           <TabsTrigger value="workflows">Workflows</TabsTrigger>
@@ -436,6 +446,10 @@ export default function IntegrationsPage() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="api-integrations" className="space-y-6">
+          <ApiIntegrationsTab />
         </TabsContent>
 
         <TabsContent value="webhooks">
