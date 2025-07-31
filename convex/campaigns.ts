@@ -661,3 +661,60 @@ export const queueCampaignEmails = internalMutation({
     return { emailsQueued: emailQueueIds.length, skippedContacts: targetContacts.length - emailQueueIds.length };
   },
 });
+
+// Update campaign status
+export const updateCampaignStatus = mutation({
+  args: {
+    id: v.id("campaigns"),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("scheduled"),
+      v.literal("sending"),
+      v.literal("sent"),
+      v.literal("paused"),
+      v.literal("cancelled")
+    ),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    
+    const campaign = await ctx.db.get(args.id);
+    if (!campaign) {
+      throw new Error("Campaign not found");
+    }
+    
+    // Verify user owns this campaign
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    
+    if (!user || campaign.userId !== user._id) {
+      throw new Error("Unauthorized");
+    }
+    
+    await ctx.db.patch(args.id, {
+      status: args.status,
+    });
+    
+    // If pausing or cancelling, update any pending schedule entries
+    if (args.status === "paused" || args.status === "cancelled") {
+      const scheduleEntries = await ctx.db
+        .query("campaignSchedules")
+        .withIndex("by_campaign", (q) => q.eq("campaignId", args.id))
+        .filter((q) => q.eq(q.field("status"), "pending"))
+        .collect();
+      
+      for (const entry of scheduleEntries) {
+        await ctx.db.patch(entry._id, {
+          status: args.status === "paused" ? "skipped" : "failed",
+        });
+      }
+    }
+    
+    return { success: true };
+  },
+});

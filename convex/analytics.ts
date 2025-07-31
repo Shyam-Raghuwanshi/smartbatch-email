@@ -320,3 +320,53 @@ export const deleteAnalyticsEntry = mutation({
     await ctx.db.delete(args.id);
   },
 });
+
+// Get campaign analytics summary
+export const getCampaignAnalytics = query({
+  args: {
+    campaignId: v.id("campaigns"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    
+    // Verify user owns the campaign
+    const campaign = await ctx.db.get(args.campaignId);
+    if (!campaign) {
+      return null;
+    }
+    
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    
+    if (!user || campaign.userId !== user._id) {
+      throw new Error("Unauthorized");
+    }
+
+    // Get all analytics for this campaign
+    const analytics = await ctx.db
+      .query("analytics")
+      .withIndex("by_campaign", (q) => q.eq("campaignId", args.campaignId))
+      .collect();
+
+    // Aggregate the metrics
+    const summary = {
+      sent: 0,
+      delivered: 0,
+      opened: 0,
+      clicked: 0,
+      bounced: 0,
+      unsubscribed: 0,
+    };
+
+    for (const entry of analytics) {
+      summary[entry.metric] += entry.value;
+    }
+
+    return summary;
+  },
+});

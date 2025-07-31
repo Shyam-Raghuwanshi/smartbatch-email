@@ -952,3 +952,41 @@ export const syncCampaignSchedules = mutation({
     return { created };
   },
 });
+
+/**
+ * Get schedule entries for a specific campaign
+ */
+export const getCampaignSchedules = query({
+  args: {
+    campaignId: v.id("campaigns"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Verify user owns the campaign
+    const campaign = await ctx.db.get(args.campaignId);
+    if (!campaign || campaign.userId !== user._id) {
+      throw new Error("Unauthorized");
+    }
+
+    const schedules = await ctx.db
+      .query("campaignSchedules")
+      .withIndex("by_campaign", (q) => q.eq("campaignId", args.campaignId))
+      .order("desc")
+      .collect();
+
+    return schedules;
+  },
+});
