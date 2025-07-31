@@ -93,6 +93,13 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     },
   });
 
+  // Update editor content when content prop changes
+  React.useEffect(() => {
+    if (editor && content !== editor.getHTML()) {
+      editor.commands.setContent(content);
+    }
+  }, [editor, content]);
+
   const insertVariable = (variable: string) => {
     if (editor) {
       editor.chain().focus().insertContent(`{{${variable}}}`).run();
