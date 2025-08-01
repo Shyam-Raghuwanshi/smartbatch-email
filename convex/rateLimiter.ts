@@ -8,18 +8,21 @@ import { internal } from "./_generated/api";
 
 const RATE_LIMITS = {
   free: {
-    emailsPerHour: 50,
-    emailsPerDay: 100,
-    batchSize: 10,
+    emailsPerHour: 2,
+    emailsPerDay: 5,
+    emailsPerMonth: 10,
+    batchSize: 1,
   },
   pro: {
-    emailsPerHour: 500,
-    emailsPerDay: 2000,
+    emailsPerHour: 100,
+    emailsPerDay: 500,
+    emailsPerMonth: 10000,
     batchSize: 50,
   },
   enterprise: {
-    emailsPerHour: 2000,
-    emailsPerDay: 10000,
+    emailsPerHour: 1000,
+    emailsPerDay: 5000,
+    emailsPerMonth: 100000,
     batchSize: 100,
   },
 };
@@ -44,6 +47,10 @@ export const checkRateLimit = internalQuery({
     const now = Date.now();
     const hourAgo = now - (60 * 60 * 1000);
     const dayAgo = now - (24 * 60 * 60 * 1000);
+    
+    // Get current month start
+    const currentDate = new Date();
+    const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getTime();
 
     // Count emails sent in the last hour
     const emailsThisHour = await ctx.db
@@ -61,28 +68,41 @@ export const checkRateLimit = internalQuery({
       .filter((q) => q.eq(q.field("status"), "sent"))
       .collect();
 
+    // Count emails sent this month
+    const emailsThisMonth = await ctx.db
+      .query("emailQueue")
+      .filter((q) => q.eq(q.field("userId"), args.userId))
+      .filter((q) => q.gte(q.field("sentAt"), monthStart))
+      .filter((q) => q.eq(q.field("status"), "sent"))
+      .collect();
+
     const hourlyUsage = emailsThisHour.length;
     const dailyUsage = emailsToday.length;
+    const monthlyUsage = emailsThisMonth.length;
 
     // Check limits
     const canSendHourly = (hourlyUsage + args.emailCount) <= limits.emailsPerHour;
     const canSendDaily = (dailyUsage + args.emailCount) <= limits.emailsPerDay;
+    const canSendMonthly = (monthlyUsage + args.emailCount) <= limits.emailsPerMonth;
 
     return {
-      canSend: canSendHourly && canSendDaily,
+      canSend: canSendHourly && canSendDaily && canSendMonthly,
       limits,
       usage: {
         hourly: hourlyUsage,
         daily: dailyUsage,
+        monthly: monthlyUsage,
       },
       remaining: {
         hourly: Math.max(0, limits.emailsPerHour - hourlyUsage),
         daily: Math.max(0, limits.emailsPerDay - dailyUsage),
+        monthly: Math.max(0, limits.emailsPerMonth - monthlyUsage),
       },
       recommendedBatchSize: Math.min(
         limits.batchSize,
         limits.emailsPerHour - hourlyUsage,
-        limits.emailsPerDay - dailyUsage
+        limits.emailsPerDay - dailyUsage,
+        limits.emailsPerMonth - monthlyUsage
       ),
     };
   },

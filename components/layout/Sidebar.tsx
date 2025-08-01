@@ -13,7 +13,8 @@ import {
   Filter,
   Calendar,
   Brain,
-  Globe
+  Globe,
+  CreditCard
   
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -57,6 +58,7 @@ const navigation: NavItem[] = [
   { name: 'Integrations', href: '/integrations', icon: Globe },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'AI Insights', href: '/ai', icon: Brain },
+  { name: 'Billing', href: '/billing', icon: CreditCard },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

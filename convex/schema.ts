@@ -17,6 +17,40 @@ export default defineSchema({
     .index("by_clerk_id", ["clerkId"])
     .index("by_email", ["email"]),
 
+  // Email Settings - Resend email service configuration
+  emailSettings: defineTable({
+    userId: v.id("users"),
+    name: v.string(), // "Primary Email", "Marketing Email", etc.
+    provider: v.literal("resend"), // Only support Resend
+    configuration: v.object({
+      apiKey: v.string(), // Encrypted API key
+      domain: v.string(), // Custom domain like "yourdomain.com"
+      defaultFromName: v.string(), // Default sender name
+      defaultFromEmail: v.string(), // Default from email like "noreply@yourdomain.com"
+      replyToEmail: v.optional(v.string()),
+    }),
+    isDefault: v.boolean(), // Primary email configuration
+    isActive: v.boolean(),
+    verificationStatus: v.object({
+      domainVerified: v.boolean(),
+      dkimSetup: v.boolean(),
+      spfSetup: v.boolean(),
+      dmarcSetup: v.boolean(),
+      lastVerified: v.optional(v.number()),
+    }),
+    customFromAddresses: v.array(v.object({
+      name: v.string(), // "Support", "Marketing", "Welcome", etc.
+      email: v.string(), // "support@yourdomain.com"
+      description: v.optional(v.string()),
+      isDefault: v.boolean(),
+    })),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_default", ["userId", "isDefault"])
+    .index("by_user_active", ["userId", "isActive"]),
+
   campaigns: defineTable({
     userId: v.id("users"),
     name: v.string(),
@@ -38,6 +72,13 @@ export default defineSchema({
       sendDelay: v.optional(v.number()),
       trackOpens: v.boolean(),
       trackClicks: v.boolean(),
+      // Email configuration for this campaign
+      emailConfig: v.optional(v.object({
+        emailSettingsId: v.optional(v.id("emailSettings")), // Use specific email config
+        customFromName: v.optional(v.string()), // Override from name for this campaign
+        customFromEmail: v.optional(v.string()), // Override from email for this campaign
+        replyToEmail: v.optional(v.string()), // Custom reply-to for this campaign
+      })),
     }),
     // Enhanced scheduling features
     scheduleSettings: v.optional(v.object({
@@ -369,6 +410,10 @@ export default defineSchema({
       // A/B testing metadata
       abTestId: v.optional(v.id("abTests")),
       variantId: v.optional(v.id("abTestVariants")),
+      // Email configuration metadata
+      emailSettingsId: v.optional(v.id("emailSettings")),
+      originalFromName: v.optional(v.string()),
+      originalFromEmail: v.optional(v.string()),
     })),
     createdAt: v.number(),
     updatedAt: v.number(),

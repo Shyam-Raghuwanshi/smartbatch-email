@@ -1,4 +1,4 @@
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { components } from "./_generated/api";
@@ -154,8 +154,6 @@ export const sendEmail = mutation({
     trackClicks: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<string> => {
-    console.log("inside sendmail")
-
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new Error("Not authenticated");
@@ -170,16 +168,39 @@ export const sendEmail = mutation({
       throw new Error("User not found");
     }
 
-    // TODO: Re-enable rate limiting after fixing imports
-    // Check rate limits
-    // const rateLimit = await ctx.runQuery(internal.rateLimiter.checkRateLimit, {
-    //   userId: user._id,
-    //   emailCount: 1,
-    // });
+    // Check monthly email usage for free plan users
+    const monthlyUsage = await ctx.runQuery(internal.userEmailUsage.getMonthlyEmailUsage, {
+      userId: user._id,
+    });
 
-    // if (!rateLimit.canSend && !args.scheduledAt) {
-    //   throw new Error(`Rate limit exceeded. You can send ${rateLimit.remaining.hourly} more emails this hour and ${rateLimit.remaining.daily} more today.`);
-    // }
+    const userPlan = user.subscription.plan || "free";
+    const monthlyLimit = userPlan === "free" ? 10 : 10000; // Free plan: 10 emails, Pro plan: 10,000 emails
+
+    if (monthlyUsage >= monthlyLimit) {
+      throw new Error(`Monthly email limit reached (${monthlyLimit} emails). Please upgrade your plan to send more emails.`);
+    }
+    console.log("inside sendmail")
+
+    // Check rate limits including monthly limits
+    const rateLimit = await ctx.runQuery(internal.rateLimiter.checkRateLimit, {
+      userId: user._id,
+      emailCount: 1,
+    });
+
+    if (!rateLimit.canSend && !args.scheduledAt) {
+      let errorMessage = "Rate limit exceeded. ";
+      if (rateLimit.remaining.monthly <= 0) {
+        errorMessage += `You've reached your monthly limit of ${rateLimit.limits.emailsPerMonth} emails. `;
+        if (user.subscription?.plan === "free") {
+          errorMessage += "Please upgrade your plan to send more emails.";
+        }
+      } else if (rateLimit.remaining.daily <= 0) {
+        errorMessage += `You can send ${rateLimit.remaining.daily} more emails today.`;
+      } else if (rateLimit.remaining.hourly <= 0) {
+        errorMessage += `You can send ${rateLimit.remaining.hourly} more emails this hour.`;
+      }
+      throw new Error(errorMessage);
+    }
 
     // Check if email is unsubscribed
     const unsubscribe = await ctx.db
@@ -360,6 +381,28 @@ export const sendBatchEmails = mutation({
       throw new Error("User not found");
     }
 
+    // Check monthly email usage for free plan users
+    const monthlyUsage = await ctx.runQuery(internal.userEmailUsage.getMonthlyEmailUsage, {
+      userId: user._id,
+    });
+
+    const userPlan = user.subscription.plan || "free";
+    const monthlyLimit = userPlan === "free" ? 10 : 10000; // Free plan: 10 emails, Pro plan: 10,000 emails
+    const remainingEmails = monthlyLimit - monthlyUsage;
+
+    if (remainingEmails <= 0) {
+      throw new Error(`Monthly email limit reached (${monthlyLimit} emails). Please upgrade your plan to send more emails.`);
+    }
+
+    // Limit batch size to remaining emails for free plan
+    const emailsToSend = Math.min(args.emails.length, remainingEmails);
+    const emailsToProcess = args.emails.slice(0, emailsToSend);
+    const emailsSkipped = args.emails.length - emailsToSend;
+
+    if (emailsSkipped > 0) {
+      console.warn(`Skipping ${emailsSkipped} emails due to monthly limit. ${remainingEmails} emails remaining this month.`);
+    }
+
     // Check rate limits and calculate optimal batch configuration
     const rateLimit = await ctx.runQuery(internal.rateLimiter.checkRateLimit, {
       userId: user._id,
@@ -367,7 +410,18 @@ export const sendBatchEmails = mutation({
     });
 
     if (!rateLimit.canSend && !args.scheduledAt) {
-      throw new Error(`Rate limit exceeded. You can send ${rateLimit.remaining.hourly} more emails this hour and ${rateLimit.remaining.daily} more today.`);
+      let errorMessage = "Rate limit exceeded. ";
+      if (rateLimit.remaining.monthly < args.emails.length) {
+        errorMessage += `You need ${args.emails.length} emails but only have ${rateLimit.remaining.monthly} left this month. `;
+        if (user.subscription?.plan === "free") {
+          errorMessage += "Please upgrade your plan to send more emails.";
+        }
+      } else if (rateLimit.remaining.daily < args.emails.length) {
+        errorMessage += `You can send ${rateLimit.remaining.daily} more emails today.`;
+      } else if (rateLimit.remaining.hourly < args.emails.length) {
+        errorMessage += `You can send ${rateLimit.remaining.hourly} more emails this hour.`;
+      }
+      throw new Error(errorMessage);
     }
 
     // TODO: Re-enable optimal batch calculation after fixing rateLimiter
@@ -379,9 +433,10 @@ export const sendBatchEmails = mutation({
     const batchSize: number = args.batchSize || 10; // Default batch size
     const delayBetweenBatches = args.delayBetweenBatches || 60000; // Default 1 minute delay
     const emailQueueIds: string[] = [];
+    let emailsSkippedInLoop = 0;
 
     // Create email queue entries for all emails
-    for (const email of args.emails) {
+    for (const email of emailsToProcess) {
       // Check unsubscribe status
       const unsubscribe = await ctx.db
         .query("unsubscribes")
@@ -390,6 +445,7 @@ export const sendBatchEmails = mutation({
         .first();
 
       if (unsubscribe) {
+        emailsSkippedInLoop++;
         continue; // Skip unsubscribed emails
       }
 
@@ -493,7 +549,7 @@ export const sendBatchEmails = mutation({
       batchId,
       optimalConfiguration: { batchSize, delayBetweenBatches },
       emailsQueued: emailQueueIds.length,
-      emailsSkipped: args.emails.length - emailQueueIds.length,
+      emailsSkipped: emailsSkipped + emailsSkippedInLoop,
     };
   },
 });
@@ -710,11 +766,38 @@ export const processEmailQueue = internalMutation({
         updatedAt: Date.now(),
       });
 
-      // Send email via Resend
-      // const fromEmail = emailQueue.fromEmail || "onboarding@resend.dev";
-      const fromEmail = "onboarding@resend.dev";
-      const fromName = emailQueue.fromName;
-      const fromAddress = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+      // Get user's email settings (if specified) or use default
+      let emailSettings = null;
+      let user = null;
+      
+      if (emailQueue.userId) {
+        user = await ctx.db.get(emailQueue.userId);
+        if (user) {
+          // Try to get specific email settings or default
+          const emailSettingsId = emailQueue.metadata?.emailSettingsId;
+          emailSettings = await ctx.runQuery(api.emailSettings.getEmailSettingsForSending, {
+            emailSettingsId: emailSettingsId,
+            clerkId: user.clerkId,
+          });
+        }
+      }
+
+      // Determine sender information
+      let fromEmail, fromName, fromAddress, apiKey;
+      
+      if (emailSettings && emailSettings.isActive) {
+        // Use custom email settings
+        fromEmail = emailQueue.fromEmail || emailSettings.configuration.defaultFromEmail;
+        fromName = emailQueue.fromName || emailSettings.configuration.defaultFromName;
+        fromAddress = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+        apiKey = emailSettings.configuration.apiKey;
+      } else {
+        // Fallback to default Resend settings
+        fromEmail = emailQueue.fromEmail || "onboarding@resend.dev";
+        fromName = emailQueue.fromName;
+        fromAddress = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+        apiKey = process.env.RESEND_API_KEY!;
+      }
       
       const emailId = await ctx.runMutation(resend.lib.sendEmail, {
         from: fromAddress,
@@ -724,7 +807,7 @@ export const processEmailQueue = internalMutation({
         text: emailQueue.textContent,
         replyTo: emailQueue.replyTo ? [emailQueue.replyTo] : undefined,
         options: {
-          apiKey: process.env.RESEND_API_KEY!,
+          apiKey: apiKey,
           initialBackoffMs: 1000,
           retryAttempts: 3,
           testMode: false,

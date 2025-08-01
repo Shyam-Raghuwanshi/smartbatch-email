@@ -2,22 +2,32 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useQuery } from "convex/react";
+import { useAuth } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Settings, Globe, Clock, RefreshCw } from "lucide-react";
+import { Settings, Globe, Clock, RefreshCw, Mail } from "lucide-react";
 import { IntegrationPollingSettings } from "@/components/settings/IntegrationPollingSettings";
+import { EmailSettingsManager } from "@/components/settings/EmailSettingsManager";
 import { useSearchParams } from "next/navigation";
 
 function SettingsContent() {
+  const { isLoaded, isSignedIn } = useAuth();
   const searchParams = useSearchParams();
   const initialTab = searchParams?.get("tab") || "general";
   const [activeTab, setActiveTab] = useState(initialTab);
   
-  const integrations = useQuery(api.integrations.getUserIntegrations);
-  const pollingSettings = useQuery(api.integrationPolling.getUserPollingSettings);
+  // Only run queries if user is authenticated and Clerk is loaded
+  const integrations = useQuery(
+    api.integrations.getUserIntegrations,
+    isLoaded && isSignedIn ? {} : "skip"
+  );
+  const pollingSettings = useQuery(
+    api.integrationPolling.getUserPollingSettings,
+    isLoaded && isSignedIn ? {} : "skip"
+  );
   
   // Filter to show only integrations that support polling
   const pollableIntegrations = integrations?.filter(i => 
@@ -26,10 +36,53 @@ function SettingsContent() {
 
   // Update tab when URL param changes
   useEffect(() => {
-    if (initialTab && initialTab !== activeTab) {
-      setActiveTab(initialTab);
+    const urlTab = searchParams?.get("tab") || "general";
+    console.log('useEffect - URL tab:', urlTab, 'Current activeTab:', activeTab);
+    if (urlTab !== activeTab) {
+      console.log('Setting activeTab to:', urlTab);
+      setActiveTab(urlTab);
     }
-  }, [initialTab, activeTab]);
+  }, [searchParams]);
+
+  // Debug logging
+  console.log('Current activeTab:', activeTab);
+  console.log('URL tab:', searchParams?.get("tab"));
+  console.log('Auth status:', { isLoaded, isSignedIn });
+
+  // Show loading state while Clerk is loading
+  if (!isLoaded) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
+            Settings
+          </h2>
+          <p className="mt-2 text-sm text-gray-700">
+            Loading...
+          </p>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect to sign-in if not authenticated
+  if (!isSignedIn) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
+            Settings
+          </h2>
+          <p className="mt-2 text-sm text-gray-700">
+            Please sign in to access settings.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -42,9 +95,15 @@ function SettingsContent() {
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+      <Tabs value={activeTab} onValueChange={(value) => {
+        console.log('Tab changed to:', value);
+        setActiveTab(value);
+        // Update URL to reflect the current tab
+        window.history.pushState({}, '', `/settings?tab=${value}`);
+      }}>
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="email">Email Settings</TabsTrigger>
           <TabsTrigger value="integrations">Integration Settings</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
@@ -61,9 +120,15 @@ function SettingsContent() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              
               <p className="text-sm text-gray-500">General settings panel coming soon...</p>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="email" className="space-y-6">
+         
+          <EmailSettingsManager />
         </TabsContent>
 
         <TabsContent value="integrations" className="space-y-6">

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
+import { useAuth } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,16 +27,17 @@ interface IntegrationPollingSettingsProps {
 }
 
 export function IntegrationPollingSettings({ integration }: IntegrationPollingSettingsProps) {
+  const { isLoaded, isSignedIn } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
 
   const updatePollingSettings = useMutation(api.integrationPolling.updatePollingSettings);
   const pollingSettings = useQuery(
     api.integrationPolling.getPollingSettings, 
-    { integrationId: integration._id }
+    isLoaded && isSignedIn ? { integrationId: integration._id } : "skip"
   );
   const syncHistory = useQuery(
     api.integrationPolling.getSyncHistory,
-    { integrationId: integration._id, limit: 5 }
+    isLoaded && isSignedIn ? { integrationId: integration._id, limit: 5 } : "skip"
   );
 
   const handleUpdateFrequency = async (frequency: string) => {
@@ -232,7 +234,7 @@ export function IntegrationPollingSettings({ integration }: IntegrationPollingSe
             <div className="space-y-2">
               <Label className="text-sm font-medium">Recent Sync Activity</Label>
               <div className="space-y-2 max-h-32 overflow-y-auto">
-                {syncHistory.map((sync) => (
+                {syncHistory.map((sync: any) => (
                   <div key={sync._id} className="flex items-center justify-between text-xs p-2 bg-gray-50 rounded">
                     <div className="flex items-center gap-2">
                       {sync.status === "completed" ? (

@@ -385,27 +385,31 @@ function getRateLimitForPlan(plan: string) {
   switch (plan) {
     case "free":
       return {
-        requestsPerMinute: 10,
-        requestsPerHour: 100,
-        requestsPerDay: 1000,
+        requestsPerMinute: 5,
+        requestsPerHour: 10,
+        requestsPerDay: 50,
+        emailsPerMonth: 10,
       };
     case "pro":
       return {
         requestsPerMinute: 100,
         requestsPerHour: 2000,
         requestsPerDay: 20000,
+        emailsPerMonth: 10000,
       };
     case "enterprise":
       return {
         requestsPerMinute: 500,
         requestsPerHour: 10000,
         requestsPerDay: 100000,
+        emailsPerMonth: 100000,
       };
     default:
       return {
-        requestsPerMinute: 5,
-        requestsPerHour: 50,
-        requestsPerDay: 500,
+        requestsPerMinute: 2,
+        requestsPerHour: 5,
+        requestsPerDay: 25,
+        emailsPerMonth: 5,
       };
   }
 }

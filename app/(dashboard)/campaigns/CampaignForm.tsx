@@ -50,6 +50,12 @@ interface FormData {
   sendDelay?: number;
   trackOpens: boolean;
   trackClicks: boolean;
+  emailConfig?: {
+    emailSettingsId?: Id<"emailSettings">;
+    customFromName?: string;
+    customFromEmail?: string;
+    replyToEmail?: string;
+  };
 }
 
 export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
@@ -58,6 +64,9 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
   );
   const templates = useQuery(api.templates.getTemplatesByUser);
   const contacts = useQuery(api.contacts.getContactsByUser);
+  const monthlyUsage = useQuery(api.userEmailUsage.getMonthlyEmailUsage);
+  const emailSettings = useQuery(api.emailSettings.getUserEmailSettings);
+  const defaultEmailSettings = useQuery(api.emailSettings.getDefaultEmailSettings);
   const createCampaign = useMutation(api.campaigns.createCampaign);
   const updateCampaign = useMutation(api.campaigns.updateCampaign);
   const getCurrentUser = useQuery(api.users.getCurrentUser);
@@ -147,6 +156,7 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
         sendDelay: existingCampaign.settings.sendDelay || 5,
         trackOpens: existingCampaign.settings.trackOpens,
         trackClicks: existingCampaign.settings.trackClicks,
+        emailConfig: existingCampaign.settings.emailConfig || {},
       });
     }
   }, [existingCampaign]);
@@ -177,6 +187,14 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
     try {
       if (!getCurrentUser) {
         throw new Error('User not found');
+      }
+
+      // Check email limits for new campaigns
+      if (!campaignId && monthlyUsage) {
+        const remainingEmails = monthlyUsage.remaining || 0;
+        if (recipientCount > remainingEmails) {
+          throw new Error(`This campaign would exceed your monthly email limit. You have ${remainingEmails} emails remaining this month. Please upgrade your plan or reduce the number of recipients.`);
+        }
       }
 
       const campaignData = {
@@ -210,6 +228,7 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
           sendDelay: formData.sendDelay,
           trackOpens: formData.trackOpens,
           trackClicks: formData.trackClicks,
+          emailConfig: formData.emailConfig,
         },
       };
 
@@ -368,6 +387,128 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                     onCheckedChange={(checked) => setFormData(prev => ({ ...prev, trackClicks: checked }))}
                   />
                   <Label htmlFor="track-clicks">Track Clicks</Label>
+                </div>
+              </div>
+
+              {/* Email Configuration Section */}
+              <div className="border-t pt-4">
+                <h3 className="text-lg font-medium mb-4">Email Configuration</h3>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="emailSettings">Email Service</Label>
+                    <Select
+                      value={formData.emailConfig?.emailSettingsId || "default"}
+                      onValueChange={(value) => setFormData(prev => ({
+                        ...prev,
+                        emailConfig: {
+                          ...prev.emailConfig,
+                          emailSettingsId: value === "default" ? undefined : value as Id<"emailSettings">
+                        }
+                      }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select email configuration" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">
+                          Default (SmartBatch Default)
+                        </SelectItem>
+                        {emailSettings?.map((setting) => (
+                          <SelectItem key={setting._id} value={setting._id}>
+                            {setting.name} - {setting.configuration.domain}
+                            {setting.isDefault && <Badge variant="outline" className="ml-2">Default</Badge>}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {(!emailSettings || emailSettings.length === 0) && (
+                      <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        No custom email configurations found. 
+                        <a href="/settings?tab=email" target="_blank" className="underline">
+                          Set one up here
+                        </a>
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="customFromName">From Name (Optional)</Label>
+                      <Input
+                        id="customFromName"
+                        value={formData.emailConfig?.customFromName || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          emailConfig: {
+                            ...prev.emailConfig,
+                            customFromName: e.target.value
+                          }
+                        }))}
+                        placeholder="Override default from name"
+                      />
+                      <p className="text-sm text-gray-500 mt-1">
+                        Leave empty to use your email configuration default
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="customFromEmail">From Email (Optional)</Label>
+                      <Input
+                        id="customFromEmail"
+                        type="email"
+                        value={formData.emailConfig?.customFromEmail || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          emailConfig: {
+                            ...prev.emailConfig,
+                            customFromEmail: e.target.value
+                          }
+                        }))}
+                        placeholder="Override default from email"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="replyToEmail">Reply-To Email (Optional)</Label>
+                    <Input
+                      id="replyToEmail"
+                      type="email"
+                      value={formData.emailConfig?.replyToEmail || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        emailConfig: {
+                          ...prev.emailConfig,
+                          replyToEmail: e.target.value
+                        }
+                      }))}
+                      placeholder="Where replies should go"
+                    />
+                    <p className="text-sm text-gray-500 mt-1">
+                      Useful for campaigns where you want replies to go to a specific address
+                    </p>
+                  </div>
+
+                  {/* Preview of final sender info */}
+                  {(formData.emailConfig?.customFromName || formData.emailConfig?.customFromEmail || defaultEmailSettings) && (
+                    <div className="bg-gray-50 p-3 rounded border">
+                      <Label className="text-sm font-medium">Email will be sent from:</Label>
+                      <p className="text-sm text-gray-700 mt-1">
+                        {formData.emailConfig?.customFromName || 
+                         defaultEmailSettings?.configuration.defaultFromName || 
+                         "Your Name"} 
+                        &lt;{formData.emailConfig?.customFromEmail || 
+                             defaultEmailSettings?.configuration.defaultFromEmail || 
+                             "noreply@yourdomain.com"}&gt;
+                      </p>
+                      {formData.emailConfig?.replyToEmail && (
+                        <p className="text-sm text-gray-700">
+                          Replies to: {formData.emailConfig.replyToEmail}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -620,6 +761,28 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                       <> with tag{formData.targetTags.length !== 1 ? 's' : ''}: {formData.targetTags.join(', ')}</>
                     )}
                   </p>
+                )}
+                
+                {/* Email limit warning */}
+                {monthlyUsage && recipientCount > 0 && (
+                  <div className="mt-2">
+                    {recipientCount > (monthlyUsage.remaining || 0) ? (
+                      <Alert className="border-red-200 bg-red-50">
+                        <AlertCircle className="h-4 w-4 text-red-600" />
+                        <AlertDescription className="text-red-700">
+                          This campaign would exceed your monthly email limit. You have {monthlyUsage.remaining || 0} emails remaining this month.
+                          <a href="/billing" className="underline ml-1">Upgrade your plan</a> to send more emails.
+                        </AlertDescription>
+                      </Alert>
+                    ) : recipientCount > (monthlyUsage.remaining || 0) * 0.8 ? (
+                      <Alert className="border-yellow-200 bg-yellow-50">
+                        <AlertCircle className="h-4 w-4 text-yellow-600" />
+                        <AlertDescription className="text-yellow-700">
+                          You're approaching your monthly email limit. {monthlyUsage.remaining || 0} emails remaining this month.
+                        </AlertDescription>
+                      </Alert>
+                    ) : null}
+                  </div>
                 )}
                 {recipientCount === 0 && formData.targetTags.length > 0 && (
                   <Alert className="border-yellow-200 bg-yellow-50 mt-2">

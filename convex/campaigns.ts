@@ -2,6 +2,56 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 
+/**
+ * Check if user can create a campaign with the given recipient count
+ */
+export const canCreateCampaign = query({
+  args: {
+    targetTags: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Count potential recipients
+    const contacts = await ctx.db
+      .query("contacts")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    const recipientCount = args.targetTags.length === 0 
+      ? contacts.length 
+      : contacts.filter(contact => 
+          contact.tags?.some(tag => args.targetTags.includes(tag))
+        ).length;
+
+    // Check monthly usage
+    const usageData = await ctx.runQuery("userEmailUsage:getMonthlyEmailUsage");
+    
+    const canSend = usageData.remaining >= recipientCount;
+    
+    return {
+      canCreate: canSend,
+      recipientCount,
+      monthlyUsage: usageData,
+      message: canSend 
+        ? `Campaign can be sent to ${recipientCount} recipients`
+        : `Cannot send campaign: need ${recipientCount} emails but only ${usageData.remaining} remaining this month`
+    };
+  },
+});
+
 // Create campaign
 export const createCampaign = mutation({
   args: {
@@ -104,6 +154,31 @@ export const createCampaign = mutation({
 
 // Get campaigns by user (authenticated)
 export const getCampaignsByUser = query({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    return await ctx.db
+      .query("campaigns")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .order("desc")
+      .collect();
+  },
+});
+
+// Alias for getUserCampaigns (for dashboard compatibility)
+export const getUserCampaigns = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
@@ -625,6 +700,18 @@ export const queueCampaignEmails = internalMutation({
       const user = await ctx.db.get(args.userId);
       if (!user) throw new Error("User not found");
 
+      // Determine sender information from campaign settings
+      let fromEmail = user.email;
+      let fromName = user.name;
+      let replyTo = undefined;
+
+      if (campaign.settings.emailConfig) {
+        // Use custom email configuration from campaign
+        fromEmail = campaign.settings.emailConfig.customFromEmail || fromEmail;
+        fromName = campaign.settings.emailConfig.customFromName || fromName;
+        replyTo = campaign.settings.emailConfig.replyToEmail;
+      }
+
       const emailQueueId = await ctx.db.insert("emailQueue", {
         userId: args.userId,
         campaignId: args.campaignId,
@@ -632,8 +719,9 @@ export const queueCampaignEmails = internalMutation({
         subject,
         htmlContent,
         textContent,
-        fromEmail: user.email,
-        fromName: user.name,
+        fromEmail,
+        fromName,
+        replyTo,
         status: "queued",
         priority: 5,
         scheduledAt: Date.now(),
@@ -650,6 +738,10 @@ export const queueCampaignEmails = internalMutation({
           trackOpens: campaign.settings.trackOpens,
           trackClicks: campaign.settings.trackClicks,
           unsubscribeToken,
+          // Email configuration metadata
+          emailSettingsId: campaign.settings.emailConfig?.emailSettingsId,
+          originalFromName: fromName,
+          originalFromEmail: fromEmail,
         },
         createdAt: Date.now(),
         updatedAt: Date.now(),
