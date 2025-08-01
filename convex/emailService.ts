@@ -792,11 +792,8 @@ export const processEmailQueue = internalMutation({
         fromAddress = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
         apiKey = emailSettings.configuration.apiKey;
       } else {
-        // Fallback to default Resend settings
-        fromEmail = emailQueue.fromEmail || "onboarding@resend.dev";
-        fromName = emailQueue.fromName;
-        fromAddress = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
-        apiKey = process.env.RESEND_API_KEY!;
+        // No email settings configured - cannot send email
+        throw new Error("Email settings not configured. Please go to Settings → Email Configuration to set up your Resend API key and domain. If you have configurations but see this error, ensure one is marked as 'Default' and 'Active'.");
       }
       
       const emailId = await ctx.runMutation(resend.lib.sendEmail, {

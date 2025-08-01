@@ -26,6 +26,7 @@ import type * as crons from "../crons.js";
 import type * as dataEncryption from "../dataEncryption.js";
 import type * as dataRetention from "../dataRetention.js";
 import type * as dataRetentionCrons from "../dataRetentionCrons.js";
+import type * as debugEmailSettings from "../debugEmailSettings.js";
 import type * as emailCompliance from "../emailCompliance.js";
 import type * as emailDashboard from "../emailDashboard.js";
 import type * as emailScheduler from "../emailScheduler.js";
@@ -107,6 +108,7 @@ declare const fullApi: ApiFromModules<{
   dataEncryption: typeof dataEncryption;
   dataRetention: typeof dataRetention;
   dataRetentionCrons: typeof dataRetentionCrons;
+  debugEmailSettings: typeof debugEmailSettings;
   emailCompliance: typeof emailCompliance;
   emailDashboard: typeof emailDashboard;
   emailScheduler: typeof emailScheduler;

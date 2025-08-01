@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useAction } from "convex/react";
+import { useQuery, useMutation, useAction, useConvex } from "convex/react";
 import { useAuth } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -14,6 +14,16 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+      AlertDialog,
+      AlertDialogAction,
+      AlertDialogCancel,
+      AlertDialogContent,
+      AlertDialogDescription,
+      AlertDialogFooter,
+      AlertDialogHeader,
+      AlertDialogTitle
+} from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
       Mail,
@@ -36,6 +46,7 @@ import { toast } from "sonner";
 
 export function EmailSettingsManager() {
       const { isLoaded, isSignedIn } = useAuth();
+      const convex = useConvex();
       const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
       const [editingSettings, setEditingSettings] = useState<Id<"emailSettings"> | null>(null);
       const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({});
@@ -52,45 +63,98 @@ export function EmailSettingsManager() {
             isLoaded && isSignedIn ? {} : "skip"
       );
 
+      // New mutation for fixing email settings issues
+      const fixEmailSettingsIssues = useMutation(api.emailSettings.fixEmailSettingsIssues);
+
+      // Debug query to check email settings status
+      const emailSettingsStatus = useQuery(
+            api.emailSettings.getUserEmailSettingsStatus,
+            isLoaded && isSignedIn ? {} : "skip"
+      );
+
+      // Action to get the full API key
       const getFullApiKey = useAction(api.emailSettings.getFullApiKey);
 
-      const toggleApiKeyVisibility = async (settingsId: string) => {
-            const currentlyShowing = showApiKeys[settingsId] || false;
-            
-            // If we're about to show the API key and don't have it yet, fetch it
-            if (!currentlyShowing && !fullApiKeys[settingsId]) {
-                  // Set loading state
-                  setLoadingApiKeys(prev => ({
-                        ...prev,
-                        [settingsId]: true
-                  }));
-
-                  try {
-                        const result = await getFullApiKey({ emailSettingsId: settingsId as Id<"emailSettings"> });
-                        setFullApiKeys(prev => ({
-                              ...prev,
-                              [settingsId]: result.apiKey
-                        }));
-                  } catch (error) {
-                        console.error('Failed to get full API key:', error);
-                        toast.error("Failed to load API key");
-                        return;
-                  } finally {
-                        // Clear loading state
-                        setLoadingApiKeys(prev => ({
-                              ...prev,
-                              [settingsId]: false
-                        }));
+      const handleFixEmailSettings = async () => {
+            try {
+                  const result = await fixEmailSettingsIssues();
+                  if (result.success) {
+                        toast.success(result.message);
+                  } else {
+                        toast.error(result.message);
                   }
+            } catch (error: any) {
+                  toast.error(error.message || "Failed to fix email settings");
             }
-
-            setShowApiKeys(prev => ({
-                  ...prev,
-                  [settingsId]: !prev[settingsId]
-            }));
       };
 
-      // Show loading state while Clerk is loading
+      // Function to check if user has configuration issues
+      const hasConfigurationIssue = () => {
+            if (!emailSettings || emailSettings.length === 0) return false;
+            
+            // Check if user has settings but no active default
+            const hasActiveDefault = emailSettings.some((setting: any) => setting.isDefault && setting.isActive);
+            return !hasActiveDefault;
+      };
+
+  const handleCopyApiKey = async (settingId: string) => {
+    try {
+      // Check if we already have the full API key in memory
+      if (fullApiKeys[settingId]) {
+        await navigator.clipboard.writeText(fullApiKeys[settingId]);
+        toast.success("API key copied to clipboard");
+        return;
+      }
+
+      // Otherwise, fetch the full API key
+      setLoadingApiKeys(prev => ({ ...prev, [settingId]: true }));
+      
+      try {
+        const result = await getFullApiKey({ emailSettingsId: settingId as Id<"emailSettings"> });
+        await navigator.clipboard.writeText(result.apiKey);
+        
+        // Store it in memory for future use during this session
+        setFullApiKeys(prev => ({ ...prev, [settingId]: result.apiKey }));
+        toast.success("API key copied to clipboard");
+      } catch (error: any) {
+        toast.error(error.message || "Failed to fetch and copy API key");
+      } finally {
+        setLoadingApiKeys(prev => ({ ...prev, [settingId]: false }));
+      }
+    } catch (error) {
+      console.error("Error copying API key:", error);
+      toast.error("Failed to copy API key");
+    }
+  };
+
+  const toggleApiKeyVisibility = async (settingId: string) => {
+    const currentVisibility = showApiKeys[settingId] || false;
+    
+    if (!currentVisibility) {
+      // User wants to show the API key - fetch it
+      setLoadingApiKeys(prev => ({ ...prev, [settingId]: true }));
+      
+      try {
+        const result = await getFullApiKey({ emailSettingsId: settingId as Id<"emailSettings"> });
+        setFullApiKeys(prev => ({ ...prev, [settingId]: result.apiKey }));
+        setShowApiKeys(prev => ({ ...prev, [settingId]: true }));
+        toast.success("API key revealed");
+      } catch (error: any) {
+        toast.error(error.message || "Failed to fetch API key");
+      } finally {
+        setLoadingApiKeys(prev => ({ ...prev, [settingId]: false }));
+      }
+    } else {
+      // User wants to hide the API key
+      setShowApiKeys(prev => ({ ...prev, [settingId]: false }));
+      // Remove the full API key from memory for security
+      setFullApiKeys(prev => {
+        const newKeys = { ...prev };
+        delete newKeys[settingId];
+        return newKeys;
+      });
+    }
+  };      // Show loading state while Clerk is loading
       if (!isLoaded) {
             return (
                   <div className="space-y-6">
@@ -147,6 +211,72 @@ export function EmailSettingsManager() {
                         </Dialog>
                   </div>
 
+                  {/* Troubleshooting Alert for Configuration Issues */}
+                  {hasConfigurationIssue() && (
+                        <Card className="border-yellow-200 bg-yellow-50">
+                              <CardContent className="pt-6">
+                                    <div className="flex items-start space-x-3">
+                                          <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                                          <div className="flex-1">
+                                                <h3 className="text-sm font-medium text-yellow-800">
+                                                      Email Configuration Issue Detected
+                                                </h3>
+                                                <p className="text-sm text-yellow-700 mt-1">
+                                                      You have email configurations but none are set as active default. This can cause email sending to fail.
+                                                </p>
+                                                <div className="mt-3">
+                                                      <Button 
+                                                            onClick={handleFixEmailSettings}
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="border-yellow-300 text-yellow-800 hover:bg-yellow-100"
+                                                      >
+                                                            <Settings className="h-4 w-4 mr-2" />
+                                                            Fix Configuration Automatically
+                                                      </Button>
+                                                </div>
+                                          </div>
+                                    </div>
+                              </CardContent>
+                        </Card>
+                  )}
+
+                  {/* Debug Status Information (only show if there are issues) */}
+                  {emailSettingsStatus && emailSettingsStatus.totalSettings > 0 && !emailSettingsStatus.hasDefaultActiveSettings && (
+                        <Card className="border-blue-200 bg-blue-50">
+                              <CardContent className="pt-6">
+                                    <div className="flex items-start space-x-3">
+                                          <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+                                          <div className="flex-1">
+                                                <h3 className="text-sm font-medium text-blue-800">
+                                                      Configuration Diagnosis
+                                                </h3>
+                                                <div className="text-sm text-blue-700 mt-2 space-y-1">
+                                                      <div>Total configurations: {emailSettingsStatus.totalSettings}</div>
+                                                      <div>Default configurations: {emailSettingsStatus.hasDefaultSettings ? "1" : "0"}</div>
+                                                      <div>Active configurations: {emailSettingsStatus.activeSettingsCount}</div>
+                                                      <div>Default + Active: {emailSettingsStatus.hasDefaultActiveSettings ? "✅ Yes" : "❌ No"}</div>
+                                                </div>
+                                                <div className="mt-3 p-3 bg-blue-100 rounded text-sm">
+                                                      <div className="font-medium text-blue-800 mb-1">Issue:</div>
+                                                      <div className="text-blue-700">
+                                                            {emailSettingsStatus.recommendation === "ACTIVATE_DEFAULT_CONFIGURATION" && 
+                                                                  "Your default configuration is inactive. Click 'Fix Configuration Automatically' to activate it."
+                                                            }
+                                                            {emailSettingsStatus.recommendation === "SET_DEFAULT_CONFIGURATION" && 
+                                                                  "No configuration is set as default. Click 'Fix Configuration Automatically' to set one as default."
+                                                            }
+                                                            {emailSettingsStatus.recommendation === "FIX_CONFIGURATION_AUTOMATICALLY" && 
+                                                                  "Configuration needs to be fixed. Click 'Fix Configuration Automatically' below."
+                                                            }
+                                                      </div>
+                                                </div>
+                                          </div>
+                                    </div>
+                              </CardContent>
+                        </Card>
+                  )}
+
                   {/* Quick Setup Guide */}
                   {!emailSettings || emailSettings.length === 0 ? (
                         <QuickSetupGuide />
@@ -155,7 +285,7 @@ export function EmailSettingsManager() {
                   {/* Email Settings List */}
                   {emailSettings && emailSettings.length > 0 ? (
                         <div className="space-y-4">
-                              {emailSettings.map((setting) => (
+                              {emailSettings.map((setting: any) => (
                                     <EmailSettingsCard
                                           key={setting._id}
                                           setting={setting}
@@ -164,6 +294,7 @@ export function EmailSettingsManager() {
                                           fullApiKey={fullApiKeys[setting._id]}
                                           loadingApiKey={loadingApiKeys[setting._id] || false}
                                           onToggleApiKey={() => toggleApiKeyVisibility(setting._id)}
+                                          onCopyApiKey={() => handleCopyApiKey(setting._id)}
                                           onEdit={() => setEditingSettings(setting._id)}
                                     />
                               ))}
@@ -171,11 +302,26 @@ export function EmailSettingsManager() {
                   ) : (
                         <Card>
                               <CardContent className="flex flex-col items-center justify-center py-12">
-                                    <Mail className="h-12 w-12 text-muted-foreground mb-4" />
-                                    <h3 className="text-lg font-semibold mb-2">No email configurations</h3>
+                                    <MailWarning className="h-12 w-12 text-red-500 mb-4" />
+                                    <h3 className="text-lg font-semibold mb-2 text-red-700">No email configurations</h3>
                                     <p className="text-muted-foreground text-center mb-4">
-                                          Add your first email configuration to start sending from your custom domain
+                                          Email sending is currently disabled. Add your first email configuration to start sending campaigns from your custom domain.
                                     </p>
+                                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 w-full max-w-md">
+                                          <div className="flex items-start space-x-2">
+                                                <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                                                <div className="text-sm text-red-700">
+                                                      <div className="font-medium mb-1">This fixes the error:</div>
+                                                      <div className="font-mono text-xs bg-red-100 p-2 rounded">
+                                                            Email settings not configured. Please set up your Resend API key...
+                                                      </div>
+                                                </div>
+                                          </div>
+                                    </div>
+                                    <Button onClick={() => setIsCreateModalOpen(true)} className="mt-2">
+                                          <Plus className="h-4 w-4 mr-2" />
+                                          Add Your First Email Configuration
+                                    </Button>
                               </CardContent>
                         </Card>
                   )}
@@ -208,6 +354,7 @@ function EmailSettingsCard({
       fullApiKey,
       loadingApiKey,
       onToggleApiKey,
+      onCopyApiKey,
       onEdit
 }: {
       setting: any;
@@ -216,11 +363,13 @@ function EmailSettingsCard({
       fullApiKey?: string;
       loadingApiKey: boolean;
       onToggleApiKey: () => void;
+      onCopyApiKey: () => void;
       onEdit: () => void;
 }) {
       const [isTesting, setIsTesting] = useState(false);
       const [isVerifying, setIsVerifying] = useState(false);
       const [lastVerificationResult, setLastVerificationResult] = useState<any>(null);
+      const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
       const testConfiguration = useAction(api.emailSettings.testEmailConfiguration);
       const verifyDomain = useAction(api.emailSettings.verifyDomainSettings);
@@ -254,29 +403,10 @@ function EmailSettingsCard({
                   // Store the verification result for the tooltip
                   setLastVerificationResult(result);
 
-                  const coreVerified = result.domainVerified && result.dkimSetup && result.spfSetup;
-                  const hasApiLimitations = result.issues?.some(issue => 
-                        issue.includes('ℹ️') || issue.includes('sending-only') || issue.includes('API limitations')
-                  );
-                  const realIssues = result.issues?.filter(issue => 
-                        !issue.includes('ℹ️') && !issue.includes('sending-only') && !issue.includes('API limitations')
-                  ) || [];
-
-                  if (coreVerified) {
-                        if (hasApiLimitations) {
-                              toast.success("Domain verified successfully! Using sending-only API key with DNS verification.");
-                        } else {
-                              toast.success("Domain verification completed successfully!");
-                        }
+                  if (result.verified) {
+                        toast.success("Domain verification completed successfully!");
                   } else {
-                        const issueCount = realIssues.length;
-                        if (issueCount > 0) {
-                              toast.warning(`Domain verification found ${issueCount} issue${issueCount !== 1 ? 's' : ''}. Hover over the status badge for details.`);
-                        } else if (hasApiLimitations) {
-                              toast.info("Domain verification completed with sending-only API key. Check status badge for details.");
-                        } else {
-                              toast.warning("Domain verification completed. Check status badge for details.");
-                        }
+                        toast.warning("Domain verification found some issues. Check the status badge for details.");
                   }
             } catch (error: any) {
                   toast.error(error.message || "Failed to verify domain");
@@ -286,140 +416,168 @@ function EmailSettingsCard({
       };
 
       const handleDelete = async () => {
-            if (confirm("Are you sure you want to delete this email configuration?")) {
-                  try {
-                        await deleteSettings({ id: setting._id });
-                        toast.success("Email configuration deleted");
-                  } catch (error: any) {
-                        toast.error(error.message || "Failed to delete configuration");
-                  }
+            try {
+                  await deleteSettings({ id: setting._id });
+                  toast.success("Email configuration deleted successfully");
+                  setShowDeleteDialog(false);
+            } catch (error: any) {
+                  toast.error(error.message || "Failed to delete configuration");
             }
       };
 
-      const copyToClipboard = (text: string) => {
-            navigator.clipboard.writeText(text);
-            toast.success("Copied to clipboard");
+      const copyToClipboard = async (text: string) => {
+            try {
+                  await navigator.clipboard.writeText(text);
+                  toast.success("API key copied to clipboard");
+            } catch (error) {
+                  toast.error("Failed to copy to clipboard");
+            }
       };
 
       return (
-            <Card>
-                  <CardHeader>
-                        <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                    <div className={`w-3 h-3 rounded-full ${setting.isActive ? "bg-green-500" : "bg-gray-400"
-                                          }`} />
-                                    <div>
-                                          <CardTitle className="flex items-center gap-2">
-                                                {setting.name}
-                                                {isDefault && <Badge variant="default">Default</Badge>}
-                                                <Badge variant="outline" className="capitalize">
-                                                      Resend
-                                                </Badge>
-                                          </CardTitle>
-                                          <CardDescription>
-                                                {setting.configuration.domain} • {setting.configuration.defaultFromEmail}
-                                          </CardDescription>
+            <>
+                  <Card>
+                        <CardHeader>
+                              <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                          <div className={`w-3 h-3 rounded-full ${setting.isActive ? "bg-green-500" : "bg-gray-400"
+                                                }`} />
+                                          <div>
+                                                <CardTitle className="flex items-center gap-2">
+                                                      {setting.name}
+                                                      {isDefault && <Badge variant="default">Default</Badge>}
+                                                      <Badge variant="outline" className="capitalize">
+                                                            Resend
+                                                      </Badge>
+                                                </CardTitle>
+                                                <CardDescription>
+                                                      {setting.configuration.domain} • {setting.configuration.defaultFromEmail}
+                                                </CardDescription>
+                                          </div>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                          <Button variant="ghost" size="sm" onClick={onEdit}>
+                                                <Edit className="h-4 w-4" />
+                                          </Button>
+                                          <Button variant="ghost" size="sm" onClick={() => setShowDeleteDialog(true)}>
+                                                <Trash2 className="h-4 w-4" />
+                                          </Button>
                                     </div>
                               </div>
-                              <div className="flex items-center space-x-2">
-                                    <Button variant="ghost" size="sm" onClick={onEdit}>
-                                          <Edit className="h-4 w-4" />
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-3">
+                                          <div>
+                                                <Label className="text-sm font-medium">API Key</Label>
+                                                <div className="flex items-center space-x-2 mt-1">
+                                                      <code className="bg-muted px-3 py-2 rounded text-sm font-mono flex-1">
+                                                            {showApiKey ? (fullApiKey || setting.configuration.apiKey) : "****" + setting.configuration.apiKey.slice(-4)}
+                                                      </code>
+                                                      <Button variant="ghost" size="sm" onClick={onToggleApiKey} disabled={loadingApiKey}>
+                                                            {loadingApiKey ? (
+                                                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                                            ) : showApiKey ? (
+                                                                  <EyeOff className="h-4 w-4" />
+                                                            ) : (
+                                                                  <Eye className="h-4 w-4" />
+                                                            )}
+                                                      </Button>
+                                                      <Button variant="ghost" size="sm" onClick={onCopyApiKey}>
+                                                            <Copy className="h-4 w-4" />
+                                                      </Button>
+                                                </div>
+                                          </div>
+
+                                          <div>
+                                                <Label className="text-sm font-medium">Default From</Label>
+                                                <p className="text-sm text-muted-foreground mt-1">
+                                                      {setting.configuration.defaultFromName} &lt;{setting.configuration.defaultFromEmail}&gt;
+                                                </p>
+                                          </div>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                          <div>
+                                                <Label className="text-sm font-medium">Domain Verification</Label>
+                                                <div className="flex items-center space-x-2 mt-1">
+                                                      <DomainStatusBadge
+                                                            status={setting.verificationStatus}
+                                                            lastVerificationResult={lastVerificationResult}
+                                                      />
+                                                      <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={handleVerifyDomain}
+                                                            disabled={isVerifying}
+                                                      >
+                                                            {isVerifying ? "Verifying..." : "Re-verify"}
+                                                      </Button>
+                                                </div>
+                                          </div>
+
+                                          <div>
+                                                <Label className="text-sm font-medium">Custom From Addresses</Label>
+                                                <div className="space-y-1 mt-1">
+                                                      {setting.customFromAddresses.map((addr: any, idx: number) => (
+                                                            <div key={idx} className="text-sm text-muted-foreground flex items-center justify-between">
+                                                                  <span>{addr.name}: {addr.email}</span>
+                                                                  {addr.isDefault && <Badge variant="outline" className="text-xs">Default</Badge>}
+                                                            </div>
+                                                      ))}
+                                                </div>
+                                          </div>
+                                    </div>
+                              </div>
+
+                              {/* Test Email Section */}
+                              <div className="border-t pt-4">
+                                    <Label className="text-sm font-medium">Test Configuration</Label>
+                                    <p className="text-sm text-muted-foreground mt-1 mb-3">
+                                          Send a test email to your account to verify the configuration is working
+                                    </p>
+                                    <Button
+                                          onClick={handleTest}
+                                          disabled={isTesting}
+                                          size="sm"
+                                          className="w-full"
+                                    >
+                                          <TestTube className="h-4 w-4 mr-2" />
+                                          {isTesting ? "Sending Test Email..." : "Send Test Email to My Account"}
                                     </Button>
-                                    <Button variant="ghost" size="sm" onClick={handleDelete}>
-                                          <Trash2 className="h-4 w-4" />
-                                    </Button>
                               </div>
-                        </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="space-y-3">
-                                    <div>
-                                          <Label className="text-sm font-medium">API Key</Label>
-                                          <div className="flex items-center space-x-2 mt-1">
-                                                <code className="bg-muted px-3 py-2 rounded text-sm font-mono flex-1">
-                                                      {showApiKey ? (fullApiKey || setting.configuration.apiKey) : "****" + setting.configuration.apiKey.slice(-4)}
-                                                </code>
-                                                <Button variant="ghost" size="sm" onClick={onToggleApiKey} disabled={loadingApiKey}>
-                                                      {loadingApiKey ? (
-                                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                                      ) : showApiKey ? (
-                                                            <EyeOff className="h-4 w-4" />
-                                                      ) : (
-                                                            <Eye className="h-4 w-4" />
-                                                      )}
-                                                </Button>
-                                                <Button variant="ghost" size="sm" onClick={() => copyToClipboard(fullApiKey || setting.configuration.apiKey)}>
-                                                      <Copy className="h-4 w-4" />
-                                                </Button>
-                                          </div>
-                                    </div>
+                        </CardContent>
+                  </Card>
 
-                                    <div>
-                                          <Label className="text-sm font-medium">Default From</Label>
-                                          <p className="text-sm text-muted-foreground mt-1">
-                                                {setting.configuration.defaultFromName} &lt;{setting.configuration.defaultFromEmail}&gt;
-                                          </p>
-                                    </div>
-                              </div>
-
-                              <div className="space-y-3">
-                                    <div>
-                                          <Label className="text-sm font-medium">Domain Verification</Label>
-                                          <div className="flex items-center space-x-2 mt-1">
-                                                <DomainStatusBadge 
-                                                      status={setting.verificationStatus} 
-                                                      lastVerificationResult={lastVerificationResult}
-                                                />
-                                                <Button
-                                                      variant="ghost"
-                                                      size="sm"
-                                                      onClick={handleVerifyDomain}
-                                                      disabled={isVerifying}
-                                                >
-                                                      {isVerifying ? "Verifying..." : "Re-verify"}
-                                                </Button>
-                                          </div>
-                                    </div>
-
-                                    <div>
-                                          <Label className="text-sm font-medium">Custom From Addresses</Label>
-                                          <div className="space-y-1 mt-1">
-                                                {setting.customFromAddresses.map((addr: any, idx: number) => (
-                                                      <div key={idx} className="text-sm text-muted-foreground flex items-center justify-between">
-                                                            <span>{addr.name}: {addr.email}</span>
-                                                            {addr.isDefault && <Badge variant="outline" className="text-xs">Default</Badge>}
-                                                      </div>
-                                                ))}
-                                          </div>
-                                    </div>
-                              </div>
-                        </div>
-
-                        {/* Test Email Section */}
-                        <div className="border-t pt-4">
-                              <Label className="text-sm font-medium">Test Configuration</Label>
-                              <p className="text-sm text-muted-foreground mt-1 mb-3">
-                                    Send a test email to your account to verify the configuration is working
-                              </p>
-                              <Button
-                                    onClick={handleTest}
-                                    disabled={isTesting}
-                                    size="sm"
-                                    className="w-full"
-                              >
-                                    <TestTube className="h-4 w-4 mr-2" />
-                                    {isTesting ? "Sending Test Email..." : "Send Test Email to My Account"}
-                              </Button>
-                        </div>
-                  </CardContent>
-            </Card>
+                  <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                        <AlertDialogContent>
+                              <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Email Settings</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                          Are you sure you want to delete your email settings? This action cannot be undone and will remove your API key, domain configuration, and all email settings.
+                                    </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                          onClick={handleDelete}
+                                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                          Delete Settings
+                                    </AlertDialogAction>
+                              </AlertDialogFooter>
+                        </AlertDialogContent>
+                  </AlertDialog>
+            </>
       );
 }
 
-function DomainStatusBadge({ status, lastVerificationResult }: { 
-      status: any; 
-      lastVerificationResult?: { issues?: string[] } 
+function DomainStatusBadge({
+      status,
+      lastVerificationResult
+}: {
+      status: any;
+      lastVerificationResult?: { issues?: string[] }
 }) {
       // Core verification requires Domain, DKIM, and SPF (DMARC is optional)
       const coreVerified = status.domainVerified && status.dkimSetup && status.spfSetup;
@@ -442,7 +600,7 @@ function DomainStatusBadge({ status, lastVerificationResult }: {
                   required: true
             },
             {
-                  label: "SPF Authorization", 
+                  label: "SPF Authorization",
                   checked: status.spfSetup,
                   icon: status.spfSetup ? "✅" : "❌",
                   required: true
@@ -467,14 +625,14 @@ function DomainStatusBadge({ status, lastVerificationResult }: {
       const tooltipContent = (
             <div className="max-w-lg space-y-3">
                   <div className="font-medium">
-                        {fullyVerified 
+                        {fullyVerified
                               ? `🎉 Fully Verified (${allCompletedCount}/${totalCount})`
-                              : coreVerified 
+                              : coreVerified
                                     ? `✅ Core Verified (${coreCompletedCount}/${coreRequiredCount} required)`
                                     : `⚠️ Verification Status (${coreCompletedCount}/${coreRequiredCount} required)`
                         }
                   </div>
-                  
+
                   <div className="space-y-1">
                         {statusDetails.map((detail, idx) => (
                               <div key={idx} className="space-y-1">
@@ -506,24 +664,23 @@ function DomainStatusBadge({ status, lastVerificationResult }: {
                   {issues.length > 0 && (
                         <div className="pt-2 border-t border-primary-foreground/20">
                               <div className="font-medium text-xs mb-2">
-                                    {issues.some(issue => issue.includes('ℹ️') || issue.includes('Note:')) 
-                                          ? "Configuration Info:" 
-                                          : issues.some(issue => issue.includes('permission') || issue.includes('API key')) 
-                                                ? "API Information:" 
+                                    {issues.some(issue => issue.includes('ℹ️') || issue.includes('Note:'))
+                                          ? "Configuration Info:"
+                                          : issues.some(issue => issue.includes('permission') || issue.includes('API key'))
+                                                ? "API Information:"
                                                 : "Issues to Fix:"
                                     }
                               </div>
                               <div className="space-y-2">
                                     {displayedIssues.map((issue, idx) => (
-                                          <div key={idx} className={`text-xs leading-relaxed ${
-                                                issue.includes('ℹ️') || issue.includes('Note:')
-                                                      ? 'text-blue-200' 
+                                          <div key={idx} className={`text-xs leading-relaxed ${issue.includes('ℹ️') || issue.includes('Note:')
+                                                      ? 'text-blue-200'
                                                       : issue.includes('permission') || issue.includes('API key')
                                                             ? 'text-gray-300'
                                                             : issue.includes('Amazon SES') || issue.includes('SPF record is configured')
                                                                   ? 'text-orange-200'
                                                                   : 'text-yellow-200'
-                                          }`}>
+                                                }`}>
                                                 • {issue}
                                           </div>
                                     ))}
@@ -535,8 +692,8 @@ function DomainStatusBadge({ status, lastVerificationResult }: {
                                                 }}
                                                 className="text-xs text-blue-300 hover:text-blue-100 underline transition-colors"
                                           >
-                                                {showAllIssues 
-                                                      ? "Show less" 
+                                                {showAllIssues
+                                                      ? "Show less"
                                                       : `Show ${issues.length - 3} more items`
                                                 }
                                           </button>
@@ -549,7 +706,7 @@ function DomainStatusBadge({ status, lastVerificationResult }: {
                         Click "Re-verify" to check current status
                   </div>
             </div>
-      );      if (fullyVerified) {
+      ); if (fullyVerified) {
             return (
                   <Tooltip>
                         <TooltipTrigger asChild>
@@ -688,9 +845,14 @@ function EmailSettingsForm({
                         replyToEmail: existingSettings.configuration.replyToEmail || "",
                         makeDefault: existingSettings.isDefault,
                   });
-                  
+
                   if (existingSettings.customFromAddresses) {
-                        setCustomAddresses(existingSettings.customFromAddresses);
+                        setCustomAddresses(
+                              existingSettings.customFromAddresses.map((addr: any) => ({
+                                    ...addr,
+                                    description: addr.description || ""
+                              }))
+                        );
                   }
             }
       }, [existingSettings]);
@@ -720,7 +882,7 @@ function EmailSettingsForm({
                               customFromAddresses: validAddresses,
                               makeDefault: formData.makeDefault,
                         };
-                        
+
                         // Only include configuration if API key is provided (user wants to update it)
                         if (formData.apiKey) {
                               updateData.configuration = configuration;
@@ -733,7 +895,7 @@ function EmailSettingsForm({
                                     replyToEmail: formData.replyToEmail || undefined,
                               };
                         }
-                        
+
                         await updateSettings(updateData);
                         toast.success("Email settings updated successfully");
                   } else {
@@ -742,7 +904,7 @@ function EmailSettingsForm({
                               toast.error("API key is required for new configurations");
                               return;
                         }
-                        
+
                         await createSettings({
                               name: formData.name,
                               provider: "resend", // Always use Resend
@@ -796,10 +958,11 @@ function EmailSettingsForm({
                                                 required={!settingsId} // Only required for new settings
                                           />
                                           <p className="text-sm text-muted-foreground mt-1">
-                                                {settingsId 
+                                                {settingsId
                                                       ? "Leave empty to keep your existing API key, or enter a new one to update it"
                                                       : "Get your API key from"
                                                 } <a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Resend Dashboard</a>
+                                                . {" "}Remember the api key should have full access
                                           </p>
                                     </div>
                                     <div>
@@ -812,7 +975,7 @@ function EmailSettingsForm({
                                                 required
                                           />
                                           <p className="text-sm text-yellow-600 mt-1 flex items-center space-x-1">
-                                                <MailWarning className="h-4 w-4"/>
+                                                <MailWarning className="h-4 w-4" />
                                                 <span>Domain must be verified in your Resend account</span>
                                           </p>
                                     </div>

@@ -884,3 +884,194 @@ async function sendTestEmailResend(emailSettings: any, testEmail: string) {
 
 // Get all API keys for a user (alias for compatibility)
 export const list = getUserEmailSettings;
+
+// Check if user has valid email settings configured
+export const hasEmailSettings = query({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return false;
+    }
+    
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    
+    if (!user) {
+      return false;
+    }
+
+    const defaultSettings = await ctx.db
+      .query("emailSettings")
+      .withIndex("by_user_default", (q) => q.eq("userId", user._id).eq("isDefault", true))
+      .first();
+
+    // Check if user has default email settings that are active
+    return defaultSettings && defaultSettings.isActive;
+  },
+});
+
+// Helper function to get user email settings or throw descriptive error
+export const requireUserEmailSettings = async (ctx: any, userId: string) => {
+  const emailSettings = await ctx.db
+    .query("emailSettings")
+    .withIndex("by_user_default", (q) => q.eq("userId", userId).eq("isDefault", true))
+    .first();
+
+  if (!emailSettings || !emailSettings.isActive) {
+    throw new Error(
+      "Email configuration required. Please set up your Resend API key and domain in Settings → Email Configuration to send emails."
+    );
+  }
+
+  // Decrypt the API key for use
+  const decryptedConfig = {
+    ...emailSettings.configuration,
+    apiKey: await decryptApiKey(emailSettings.configuration.apiKey),
+    smtpPassword: emailSettings.configuration.smtpPassword 
+      ? await decryptApiKey(emailSettings.configuration.smtpPassword)
+      : undefined,
+  };
+
+  return {
+    ...emailSettings,
+    configuration: decryptedConfig,
+  };
+};
+
+// Fix email settings issues - Auto-activate and set default if user has settings but none are active/default
+export const fixEmailSettingsIssues = mutation({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Get all email settings for this user
+    const allEmailSettings = await ctx.db
+      .query("emailSettings")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    if (allEmailSettings.length === 0) {
+      return { 
+        success: false, 
+        message: "No email settings found. Please create email settings first." 
+      };
+    }
+
+    // Check if user has any active default settings
+    const activeDefaultSettings = allEmailSettings.find(
+      setting => setting.isDefault && setting.isActive
+    );
+
+    if (activeDefaultSettings) {
+      return { 
+        success: true, 
+        message: "Email settings are already configured correctly." 
+      };
+    }
+
+    // Find first setting to make default and active
+    const firstSetting = allEmailSettings[0];
+    
+    // Deactivate all other defaults first
+    for (const setting of allEmailSettings) {
+      if (setting._id !== firstSetting._id && setting.isDefault) {
+        await ctx.db.patch(setting._id, { isDefault: false });
+      }
+    }
+
+    // Make the first setting default and active
+    await ctx.db.patch(firstSetting._id, {
+      isDefault: true,
+      isActive: true,
+      updatedAt: Date.now(),
+    });
+
+    return {
+      success: true,
+      message: `Fixed email settings. Set "${firstSetting.name}" as active default configuration.`,
+      settingName: firstSetting.name,
+    };
+  },
+});
+
+// Get user's email settings status for debugging
+export const getUserEmailSettingsStatus = query({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return { authenticated: false };
+    }
+    
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    
+    if (!user) {
+      return { authenticated: true, userFound: false };
+    }
+
+    // Get all email settings for this user
+    const allSettings = await ctx.db
+      .query("emailSettings")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    // Get default active settings
+    const defaultActiveSettings = allSettings.find(
+      setting => setting.isDefault && setting.isActive
+    );
+
+    // Get just default settings (might not be active)
+    const defaultSettings = allSettings.find(setting => setting.isDefault);
+
+    // Get just active settings (might not be default)
+    const activeSettings = allSettings.filter(setting => setting.isActive);
+
+    return {
+      authenticated: true,
+      userFound: true,
+      userId: user._id,
+      totalSettings: allSettings.length,
+      hasDefaultActiveSettings: !!defaultActiveSettings,
+      hasDefaultSettings: !!defaultSettings,
+      activeSettingsCount: activeSettings.length,
+      settings: allSettings.map(setting => ({
+        id: setting._id,
+        name: setting.name,
+        isDefault: setting.isDefault,
+        isActive: setting.isActive,
+        domain: setting.configuration.domain,
+        defaultFromEmail: setting.configuration.defaultFromEmail,
+      })),
+      recommendation: (() => {
+        if (allSettings.length === 0) {
+          return "CREATE_FIRST_CONFIGURATION";
+        } else if (!defaultActiveSettings) {
+          if (defaultSettings && !defaultSettings.isActive) {
+            return "ACTIVATE_DEFAULT_CONFIGURATION";
+          } else if (!defaultSettings) {
+            return "SET_DEFAULT_CONFIGURATION";
+          } else {
+            return "FIX_CONFIGURATION_AUTOMATICALLY";
+          }
+        } else {
+          return "CONFIGURATION_OK";
+        }
+      })(),
+    };
+  },
+});

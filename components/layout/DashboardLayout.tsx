@@ -4,6 +4,7 @@ import { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 import TopNav from './TopNav';
+import { EmailSetupPrompt } from '@/components/email-setup-prompt';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -28,6 +29,9 @@ export default function DashboardLayout({ children, title }: DashboardLayoutProp
 
   return (
     <div className="h-full">
+      {/* Email Setup Prompt */}
+      <EmailSetupPrompt />
+      
       {/* Sidebar */}
       <Sidebar />
 

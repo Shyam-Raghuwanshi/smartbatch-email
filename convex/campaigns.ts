@@ -74,6 +74,12 @@ export const createCampaign = mutation({
       sendDelay: v.optional(v.number()),
       trackOpens: v.boolean(),
       trackClicks: v.boolean(),
+      emailConfig: v.optional(v.object({
+        emailSettingsId: v.optional(v.id("emailSettings")),
+        customFromName: v.optional(v.string()),
+        customFromEmail: v.optional(v.string()),
+        replyToEmail: v.optional(v.string()),
+      })),
     }),
     scheduleSettings: v.optional(v.object({
       type: v.union(
@@ -252,6 +258,12 @@ export const updateCampaign = mutation({
       sendDelay: v.optional(v.number()),
       trackOpens: v.boolean(),
       trackClicks: v.boolean(),
+      emailConfig: v.optional(v.object({
+        emailSettingsId: v.optional(v.id("emailSettings")),
+        customFromName: v.optional(v.string()),
+        customFromEmail: v.optional(v.string()),
+        replyToEmail: v.optional(v.string()),
+      })),
     })),
     scheduleSettings: v.optional(v.object({
       type: v.union(
@@ -700,16 +712,29 @@ export const queueCampaignEmails = internalMutation({
       const user = await ctx.db.get(args.userId);
       if (!user) throw new Error("User not found");
 
+      // Get default email settings for the user
+      const defaultEmailSettings = await ctx.db
+        .query("emailSettings")
+        .withIndex("by_user_default", (q) => q.eq("userId", user._id).eq("isDefault", true))
+        .first();
+
       // Determine sender information from campaign settings
       let fromEmail = user.email;
       let fromName = user.name;
       let replyTo = undefined;
 
+      // Use default email settings if available
+      if (defaultEmailSettings && defaultEmailSettings.isActive) {
+        fromEmail = defaultEmailSettings.configuration.defaultFromEmail;
+        fromName = defaultEmailSettings.configuration.defaultFromName;
+        replyTo = defaultEmailSettings.configuration.replyToEmail;
+      }
+
+      // Allow campaign-specific overrides
       if (campaign.settings.emailConfig) {
-        // Use custom email configuration from campaign
         fromEmail = campaign.settings.emailConfig.customFromEmail || fromEmail;
         fromName = campaign.settings.emailConfig.customFromName || fromName;
-        replyTo = campaign.settings.emailConfig.replyToEmail;
+        replyTo = campaign.settings.emailConfig.replyToEmail || replyTo;
       }
 
       const emailQueueId = await ctx.db.insert("emailQueue", {
@@ -739,7 +764,7 @@ export const queueCampaignEmails = internalMutation({
           trackClicks: campaign.settings.trackClicks,
           unsubscribeToken,
           // Email configuration metadata
-          emailSettingsId: campaign.settings.emailConfig?.emailSettingsId,
+          emailSettingsId: campaign.settings.emailConfig?.emailSettingsId || defaultEmailSettings?._id,
           originalFromName: fromName,
           originalFromEmail: fromEmail,
         },
