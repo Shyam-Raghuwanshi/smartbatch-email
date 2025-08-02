@@ -1060,8 +1060,12 @@ function processTemplate(template: string, variables: Record<string, any>): stri
   let processed = template;
   
   for (const [key, value] of Object.entries(variables)) {
-    const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
-    processed = processed.replace(regex, String(value));
+    // Handle both {{variable}} and {variable} formats for backward compatibility
+    const doubleRegex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+    const singleRegex = new RegExp(`{\\s*${key}\\s*}`, 'g');
+    
+    processed = processed.replace(doubleRegex, String(value));
+    processed = processed.replace(singleRegex, String(value));
   }
   
   return processed;

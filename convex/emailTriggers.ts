@@ -656,15 +656,27 @@ function personalizeEmailContent(
 ): string {
   let personalizedContent = content;
 
-  // Standard personalization
-  personalizedContent = personalizedContent.replace(/\{\{name\}\}/g, contact.name || "");
-  personalizedContent = personalizedContent.replace(/\{\{email\}\}/g, contact.email || "");
+  // Standard personalization with both formats
+  personalizedContent = personalizedContent.replace(/{{name}}/g, contact.name || "");
+  personalizedContent = personalizedContent.replace(/{{email}}/g, contact.email || "");
+  personalizedContent = personalizedContent.replace(/{{firstName}}/g, contact.firstName || "");
+  personalizedContent = personalizedContent.replace(/{{lastName}}/g, contact.lastName || "");
+  personalizedContent = personalizedContent.replace(/{{company}}/g, contact.company || "");
+  
+  // Backward compatibility with single braces
+  personalizedContent = personalizedContent.replace(/{name}/g, contact.name || "");
+  personalizedContent = personalizedContent.replace(/{email}/g, contact.email || "");
+  personalizedContent = personalizedContent.replace(/{firstName}/g, contact.firstName || "");
+  personalizedContent = personalizedContent.replace(/{lastName}/g, contact.lastName || "");
+  personalizedContent = personalizedContent.replace(/{company}/g, contact.company || "");
 
   // Custom field personalization
   for (const field of personalizeFields) {
     const value = contact.customFields?.[field] || "";
-    const regex = new RegExp(`\\{\\{${field}\\}\\}`, "g");
-    personalizedContent = personalizedContent.replace(regex, value);
+    const doubleRegex = new RegExp(`\\{\\{${field}\\}\\}`, "g");
+    const singleRegex = new RegExp(`\\{${field}\\}`, "g");
+    personalizedContent = personalizedContent.replace(doubleRegex, value);
+    personalizedContent = personalizedContent.replace(singleRegex, value);
   }
 
   return personalizedContent;

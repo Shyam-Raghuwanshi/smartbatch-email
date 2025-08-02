@@ -203,13 +203,24 @@ export const previewEmailTemplate = query({
 
 // Helper functions
 function extractVariables(content: string): string[] {
-  const regex = /{{([^}]+)}}/g;
-  const variables: any[] = [];
-  let match;
+  const variables: string[] = [];
   
-  while ((match = regex.exec(content)) !== null) {
+  // Extract {{variable}} format
+  const doubleRegex = /{{([^}]+)}}/g;
+  let match;
+  while ((match = doubleRegex.exec(content)) !== null) {
     const variable = match[1].trim();
     if (!variables.includes(variable)) {
+      variables.push(variable);
+    }
+  }
+  
+  // Extract {variable} format (single braces)
+  const singleRegex = /{([^}]+)}/g;
+  while ((match = singleRegex.exec(content)) !== null) {
+    const variable = match[1].trim();
+    // Avoid duplicates and only add if it's a simple variable name (no spaces or special chars except underscore)
+    if (!variables.includes(variable) && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(variable)) {
       variables.push(variable);
     }
   }
@@ -221,8 +232,12 @@ function processTemplateString(template: string, variables: Record<string, any>)
   let processed = template;
   
   for (const [key, value] of Object.entries(variables)) {
-    const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
-    processed = processed.replace(regex, String(value));
+    // Handle both {{variable}} and {variable} formats for backward compatibility
+    const doubleRegex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+    const singleRegex = new RegExp(`{\\s*${key}\\s*}`, 'g');
+    
+    processed = processed.replace(doubleRegex, String(value));
+    processed = processed.replace(singleRegex, String(value));
   }
   
   return processed;

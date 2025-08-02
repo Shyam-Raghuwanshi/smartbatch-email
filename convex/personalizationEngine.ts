@@ -134,7 +134,7 @@ export const generateDynamicContentBlocks = action({
 async function applyBasicPersonalization(content: string, contact: any) {
   let personalized = content;
 
-  // Replace basic tokens
+  // Replace basic tokens with both formats
   const replacements = {
     '{firstName}': contact.firstName || 'there',
     '{lastName}': contact.lastName || '',
@@ -145,13 +145,25 @@ async function applyBasicPersonalization(content: string, contact: any) {
     '{email}': contact.email,
     '{company}': contact.company || 'your company',
     '{position}': contact.position || '',
-    '{phone}': contact.phone || ''
+    '{phone}': contact.phone || '',
+    // Double brace versions
+    '{{firstName}}': contact.firstName || 'there',
+    '{{lastName}}': contact.lastName || '',
+    '{{name}}': contact.firstName || 'there',
+    '{{fullName}}': contact.firstName && contact.lastName 
+      ? `${contact.firstName} ${contact.lastName}` 
+      : contact.firstName || 'there',
+    '{{email}}': contact.email,
+    '{{company}}': contact.company || 'your company',
+    '{{position}}': contact.position || '',
+    '{{phone}}': contact.phone || ''
   };
 
-  // Apply custom fields
+  // Apply custom fields for both formats
   if (contact.customFields) {
     Object.entries(contact.customFields).forEach(([key, value]) => {
       replacements[`{${key}}`] = String(value);
+      replacements[`{{${key}}}`] = String(value);
     });
   }
 

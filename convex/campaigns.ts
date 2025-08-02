@@ -696,11 +696,45 @@ export const queueCampaignEmails = internalMutation({
         }
       }
 
-      // Replace variables
+      // Replace variables with both formats for compatibility
       const name = `${contact.firstName || ""} ${contact.lastName || ""}`.trim();
+      
+      // Handle {{variable}} format
+      htmlContent = htmlContent.replace(/{{name}}/g, name);
+      htmlContent = htmlContent.replace(/{{firstName}}/g, contact.firstName || "");
+      htmlContent = htmlContent.replace(/{{lastName}}/g, contact.lastName || "");
+      htmlContent = htmlContent.replace(/{{email}}/g, contact.email || "");
+      htmlContent = htmlContent.replace(/{{company}}/g, contact.company || "");
+      
+      // Handle {variable} format for backward compatibility  
       htmlContent = htmlContent.replace(/{name}/g, name);
+      htmlContent = htmlContent.replace(/{firstName}/g, contact.firstName || "");
+      htmlContent = htmlContent.replace(/{lastName}/g, contact.lastName || "");
+      htmlContent = htmlContent.replace(/{email}/g, contact.email || "");
+      htmlContent = htmlContent.replace(/{company}/g, contact.company || "");
+      
+      // Apply same replacements to text and subject
+      textContent = textContent.replace(/{{name}}/g, name);
+      textContent = textContent.replace(/{{firstName}}/g, contact.firstName || "");
+      textContent = textContent.replace(/{{lastName}}/g, contact.lastName || "");
+      textContent = textContent.replace(/{{email}}/g, contact.email || "");
+      textContent = textContent.replace(/{{company}}/g, contact.company || "");
       textContent = textContent.replace(/{name}/g, name);
+      textContent = textContent.replace(/{firstName}/g, contact.firstName || "");
+      textContent = textContent.replace(/{lastName}/g, contact.lastName || "");
+      textContent = textContent.replace(/{email}/g, contact.email || "");
+      textContent = textContent.replace(/{company}/g, contact.company || "");
+      
+      subject = subject.replace(/{{name}}/g, name);
+      subject = subject.replace(/{{firstName}}/g, contact.firstName || "");
+      subject = subject.replace(/{{lastName}}/g, contact.lastName || "");
+      subject = subject.replace(/{{email}}/g, contact.email || "");
+      subject = subject.replace(/{{company}}/g, contact.company || "");
       subject = subject.replace(/{name}/g, name);
+      subject = subject.replace(/{firstName}/g, contact.firstName || "");
+      subject = subject.replace(/{lastName}/g, contact.lastName || "");
+      subject = subject.replace(/{email}/g, contact.email || "");
+      subject = subject.replace(/{company}/g, contact.company || "");
 
       const user = await ctx.db.get(args.userId);
       if (!user) throw new Error("User not found");
