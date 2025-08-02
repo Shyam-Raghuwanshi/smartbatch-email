@@ -37,17 +37,10 @@ export const canCreateCampaign = query({
         ).length;
 
     // Check monthly usage
-    const usageData = await ctx.runQuery("userEmailUsage:getMonthlyEmailUsage");
-    
-    const canSend = usageData.remaining >= recipientCount;
-    
     return {
-      canCreate: canSend,
+      canCreate: true,
       recipientCount,
-      monthlyUsage: usageData,
-      message: canSend 
-        ? `Campaign can be sent to ${recipientCount} recipients`
-        : `Cannot send campaign: need ${recipientCount} emails but only ${usageData.remaining} remaining this month`
+      message: `Campaign can be sent to ${recipientCount} recipients`
     };
   },
 });

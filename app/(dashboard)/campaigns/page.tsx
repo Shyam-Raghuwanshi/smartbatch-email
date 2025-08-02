@@ -22,6 +22,17 @@ import {
   DialogTitle,
   DialogTrigger
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   Plus,
@@ -135,6 +146,9 @@ export default function CampaignsPage() {
   const [detailCampaign, setDetailCampaign] = useState<Id<"campaigns"> | null>(null);
   const [selectedCampaigns, setSelectedCampaigns] = useState<Set<Id<"campaigns">>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [campaignToDelete, setCampaignToDelete] = useState<Id<"campaigns"> | null>(null);
 
   // Utility functions
   const formatDate = (date: number) => {
@@ -229,12 +243,22 @@ export default function CampaignsPage() {
   };
 
   const handleDeleteCampaign = async (campaignId: Id<"campaigns">) => {
-    if (confirm('Are you sure you want to delete this campaign? This action cannot be undone.')) {
-      try {
-        await deleteCampaign({ id: campaignId });
-      } catch (error) {
-        console.error('Failed to delete campaign:', error);
-      }
+    setCampaignToDelete(campaignId);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteCampaign = async () => {
+    if (!campaignToDelete) return;
+    
+    try {
+      await deleteCampaign({ id: campaignToDelete });
+      toast.success('Campaign deleted successfully');
+    } catch (error) {
+      console.error('Failed to delete campaign:', error);
+      toast.error('Failed to delete campaign');
+    } finally {
+      setDeleteDialogOpen(false);
+      setCampaignToDelete(null);
     }
   };
 
@@ -260,14 +284,12 @@ export default function CampaignsPage() {
   };
 
   const handleSeedSampleData = async () => {
-    if (confirm('This will create sample campaigns, templates, and contacts for testing. Continue?')) {
-      try {
-        await seedSampleData();
-        toast.success('Sample data created successfully!');
-      } catch (error) {
-        console.error('Failed to seed sample data:', error);
-        toast.error('Failed to create sample data');
-      }
+    try {
+      await seedSampleData();
+      toast.success('Sample data created successfully!');
+    } catch (error) {
+      console.error('Failed to seed sample data:', error);
+      toast.error('Failed to create sample data');
     }
   };
 
@@ -286,32 +308,34 @@ export default function CampaignsPage() {
   };
 
   const handleBulkStatusChange = async (newStatus: CampaignStatus) => {
-    if (confirm(`Change status to "${newStatus}" for ${selectedCampaigns.size} selected campaigns?`)) {
-      try {
-        const promises = Array.from(selectedCampaigns).map(id =>
-          updateCampaign({ id, status: newStatus })
-        );
-        await Promise.all(promises);
-        toast.success(`Updated ${selectedCampaigns.size} campaigns`);
-        clearSelection();
-      } catch (error) {
-        console.error('Failed to update campaigns:', error);
-        toast.error('Failed to update campaigns');
-      }
+    try {
+      const promises = Array.from(selectedCampaigns).map(id =>
+        updateCampaign({ id, status: newStatus })
+      );
+      await Promise.all(promises);
+      toast.success(`Updated ${selectedCampaigns.size} campaigns to ${newStatus}`);
+      clearSelection();
+    } catch (error) {
+      console.error('Failed to update campaigns:', error);
+      toast.error('Failed to update campaigns');
     }
   };
 
   const handleBulkDelete = async () => {
-    if (confirm(`Delete ${selectedCampaigns.size} selected campaigns? This action cannot be undone.`)) {
-      try {
-        const promises = Array.from(selectedCampaigns).map(id => deleteCampaign({ id }));
-        await Promise.all(promises);
-        toast.success(`Deleted ${selectedCampaigns.size} campaigns`);
-        clearSelection();
-      } catch (error) {
-        console.error('Failed to delete campaigns:', error);
-        toast.error('Failed to delete campaigns');
-      }
+    setBulkDeleteDialogOpen(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    try {
+      const promises = Array.from(selectedCampaigns).map(id => deleteCampaign({ id }));
+      await Promise.all(promises);
+      toast.success(`Deleted ${selectedCampaigns.size} campaigns`);
+      clearSelection();
+    } catch (error) {
+      console.error('Failed to delete campaigns:', error);
+      toast.error('Failed to delete campaigns');
+    } finally {
+      setBulkDeleteDialogOpen(false);
     }
   };
 
@@ -393,6 +417,13 @@ export default function CampaignsPage() {
           testAuth={testAuth}
           testPublic={testPublic}
           formatDate={formatDate}
+          deleteDialogOpen={deleteDialogOpen}
+          setDeleteDialogOpen={setDeleteDialogOpen}
+          bulkDeleteDialogOpen={bulkDeleteDialogOpen}
+          setBulkDeleteDialogOpen={setBulkDeleteDialogOpen}
+          campaignToDelete={campaignToDelete}
+          confirmDeleteCampaign={confirmDeleteCampaign}
+          confirmBulkDelete={confirmBulkDelete}
         />
       </Authenticated>
     </>
@@ -431,7 +462,14 @@ function CampaignsContent({
   clearSelection,
   testAuth,
   testPublic,
-  formatDate
+  formatDate,
+  deleteDialogOpen,
+  setDeleteDialogOpen,
+  bulkDeleteDialogOpen,
+  setBulkDeleteDialogOpen,
+  campaignToDelete,
+  confirmDeleteCampaign,
+  confirmBulkDelete
 }: {
   campaigns: any[];
   mergedCampaigns: any[];
@@ -465,6 +503,13 @@ function CampaignsContent({
   testAuth: any;
   testPublic: any;
   formatDate: (timestamp: number) => string;
+  deleteDialogOpen: boolean;
+  setDeleteDialogOpen: (open: boolean) => void;
+  bulkDeleteDialogOpen: boolean;
+  setBulkDeleteDialogOpen: (open: boolean) => void;
+  campaignToDelete: Id<"campaigns"> | null;
+  confirmDeleteCampaign: () => void;
+  confirmBulkDelete: () => void;
 }) {
   const StatusBadge = ({ status }: { status: CampaignStatus }) => {
     const config = statusConfig[status];
@@ -921,6 +966,48 @@ function CampaignsContent({
         isOpen={!!detailCampaign}
         onClose={() => setDetailCampaign(null)}
       />
+
+      {/* Delete Campaign Alert Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Campaign</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this campaign? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDeleteCampaign}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Alert Dialog */}
+      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Multiple Campaigns</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedCampaigns.size} selected campaigns? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmBulkDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete {selectedCampaigns.size} Campaigns
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

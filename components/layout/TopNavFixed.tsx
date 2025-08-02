@@ -36,14 +36,6 @@ const mockNotifications: Notification[] = [
     type: 'success',
   },
   {
-    id: '2',
-    title: 'Low Email Credits',
-    message: 'You have only 150 email credits remaining this month',
-    time: '1 hour ago',
-    read: false,
-    type: 'warning',
-  },
-  {
     id: '3',
     title: 'New Contact Added',
     message: '25 new contacts were imported from your CSV file',

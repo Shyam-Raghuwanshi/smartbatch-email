@@ -395,12 +395,9 @@ function ApiOverview() {
 
           <div className="space-y-3">
             <h4 className="font-semibold">Rate Limits</h4>
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 gap-4 text-sm">
               <div>
-                <strong>Free Plan:</strong> 1,000 requests/hour
-              </div>
-              <div>
-                <strong>Pro Plan:</strong> 10,000 requests/hour
+                <strong>Standard:</strong> 10,000 requests/hour
               </div>
               <div>
                 <strong>Enterprise:</strong> Custom limits

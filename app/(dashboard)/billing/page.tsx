@@ -210,9 +210,9 @@ export default function BillingPage() {
             </Card>
             <Card>
               <CardContent className="p-6">
-                <h3 className="font-semibold mb-2">What happens if I exceed my email limit?</h3>
+                <h3 className="font-semibold mb-2">How does email sending work?</h3>
                 <p className="text-gray-600 text-sm">
-                  You'll be prompted to upgrade your plan. Free plan users are limited to 10 emails per month.
+                  You use your own email service provider's API (like SendGrid, Mailgun, etc.) so there are no limits imposed by our platform.
                 </p>
               </CardContent>
             </Card>

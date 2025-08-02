@@ -99,44 +99,6 @@ export default function BillingPage() {
         </p>
       </div>
 
-      {/* Current Usage Summary */}
-      {monthlyUsage && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Current Usage</CardTitle>
-            <CardDescription>Your email usage for this month</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-2xl font-bold">
-                  {monthlyUsage.usage} / {monthlyUsage.limit}
-                </p>
-                <p className="text-sm text-gray-600">emails sent this month</p>
-              </div>
-              <Badge variant={monthlyUsage.plan === 'free' ? 'secondary' : 'default'}>
-                {monthlyUsage.plan.charAt(0).toUpperCase() + monthlyUsage.plan.slice(1)} Plan
-              </Badge>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  monthlyUsage.usagePercentage > 90 
-                    ? 'bg-red-600' 
-                    : monthlyUsage.usagePercentage > 75 
-                      ? 'bg-yellow-600' 
-                      : 'bg-blue-600'
-                }`}
-                style={{ width: `${Math.min(monthlyUsage.usagePercentage, 100)}%` }}
-              ></div>
-            </div>
-            <p className="text-sm text-gray-600 mt-2">
-              {monthlyUsage.remaining} emails remaining
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Pricing Plans */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {plans.map((plan) => (

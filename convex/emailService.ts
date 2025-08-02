@@ -168,20 +168,9 @@ export const sendEmail = mutation({
       throw new Error("User not found");
     }
 
-    // Check monthly email usage for free plan users
-    const monthlyUsage = await ctx.runQuery(internal.userEmailUsage.getMonthlyEmailUsage, {
-      userId: user._id,
-    });
-
-    const userPlan = user.subscription.plan || "free";
-    const monthlyLimit = userPlan === "free" ? 10 : 10000; // Free plan: 10 emails, Pro plan: 10,000 emails
-
-    if (monthlyUsage >= monthlyLimit) {
-      throw new Error(`Monthly email limit reached (${monthlyLimit} emails). Please upgrade your plan to send more emails.`);
-    }
     console.log("inside sendmail")
 
-    // Check rate limits including monthly limits
+    // Check rate limits (but not monthly limits since users use their own API keys)
     const rateLimit = await ctx.runQuery(internal.rateLimiter.checkRateLimit, {
       userId: user._id,
       emailCount: 1,
@@ -189,12 +178,7 @@ export const sendEmail = mutation({
 
     if (!rateLimit.canSend && !args.scheduledAt) {
       let errorMessage = "Rate limit exceeded. ";
-      if (rateLimit.remaining.monthly <= 0) {
-        errorMessage += `You've reached your monthly limit of ${rateLimit.limits.emailsPerMonth} emails. `;
-        if (user.subscription?.plan === "free") {
-          errorMessage += "Please upgrade your plan to send more emails.";
-        }
-      } else if (rateLimit.remaining.daily <= 0) {
+      if (rateLimit.remaining.daily <= 0) {
         errorMessage += `You can send ${rateLimit.remaining.daily} more emails today.`;
       } else if (rateLimit.remaining.hourly <= 0) {
         errorMessage += `You can send ${rateLimit.remaining.hourly} more emails this hour.`;
@@ -381,29 +365,7 @@ export const sendBatchEmails = mutation({
       throw new Error("User not found");
     }
 
-    // Check monthly email usage for free plan users
-    const monthlyUsage = await ctx.runQuery(internal.userEmailUsage.getMonthlyEmailUsage, {
-      userId: user._id,
-    });
-
-    const userPlan = user.subscription.plan || "free";
-    const monthlyLimit = userPlan === "free" ? 10 : 10000; // Free plan: 10 emails, Pro plan: 10,000 emails
-    const remainingEmails = monthlyLimit - monthlyUsage;
-
-    if (remainingEmails <= 0) {
-      throw new Error(`Monthly email limit reached (${monthlyLimit} emails). Please upgrade your plan to send more emails.`);
-    }
-
-    // Limit batch size to remaining emails for free plan
-    const emailsToSend = Math.min(args.emails.length, remainingEmails);
-    const emailsToProcess = args.emails.slice(0, emailsToSend);
-    const emailsSkipped = args.emails.length - emailsToSend;
-
-    if (emailsSkipped > 0) {
-      console.warn(`Skipping ${emailsSkipped} emails due to monthly limit. ${remainingEmails} emails remaining this month.`);
-    }
-
-    // Check rate limits and calculate optimal batch configuration
+    // Check rate limits (but not monthly limits since users use their own API keys)
     const rateLimit = await ctx.runQuery(internal.rateLimiter.checkRateLimit, {
       userId: user._id,
       emailCount: args.emails.length,
@@ -411,12 +373,7 @@ export const sendBatchEmails = mutation({
 
     if (!rateLimit.canSend && !args.scheduledAt) {
       let errorMessage = "Rate limit exceeded. ";
-      if (rateLimit.remaining.monthly < args.emails.length) {
-        errorMessage += `You need ${args.emails.length} emails but only have ${rateLimit.remaining.monthly} left this month. `;
-        if (user.subscription?.plan === "free") {
-          errorMessage += "Please upgrade your plan to send more emails.";
-        }
-      } else if (rateLimit.remaining.daily < args.emails.length) {
+      if (rateLimit.remaining.daily < args.emails.length) {
         errorMessage += `You can send ${rateLimit.remaining.daily} more emails today.`;
       } else if (rateLimit.remaining.hourly < args.emails.length) {
         errorMessage += `You can send ${rateLimit.remaining.hourly} more emails this hour.`;
@@ -436,7 +393,7 @@ export const sendBatchEmails = mutation({
     let emailsSkippedInLoop = 0;
 
     // Create email queue entries for all emails
-    for (const email of emailsToProcess) {
+    for (const email of args.emails) {
       // Check unsubscribe status
       const unsubscribe = await ctx.db
         .query("unsubscribes")
@@ -549,7 +506,7 @@ export const sendBatchEmails = mutation({
       batchId,
       optimalConfiguration: { batchSize, delayBetweenBatches },
       emailsQueued: emailQueueIds.length,
-      emailsSkipped: emailsSkipped + emailsSkippedInLoop,
+      emailsSkipped: emailsSkippedInLoop,
     };
   },
 });

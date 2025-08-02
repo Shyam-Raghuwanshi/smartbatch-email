@@ -189,14 +189,6 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
         throw new Error('User not found');
       }
 
-      // Check email limits for new campaigns
-      if (!campaignId && monthlyUsage) {
-        const remainingEmails = monthlyUsage.remaining || 0;
-        if (recipientCount > remainingEmails) {
-          throw new Error(`This campaign would exceed your monthly email limit. You have ${remainingEmails} emails remaining this month. Please upgrade your plan or reduce the number of recipients.`);
-        }
-      }
-
       const campaignData = {
         name: formData.name,
         status: (formData.scheduleType === 'scheduled' && formData.scheduledAt) 
@@ -762,28 +754,7 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                     )}
                   </p>
                 )}
-                
-                {/* Email limit warning */}
-                {monthlyUsage && recipientCount > 0 && (
-                  <div className="mt-2">
-                    {recipientCount > (monthlyUsage.remaining || 0) ? (
-                      <Alert className="border-red-200 bg-red-50">
-                        <AlertCircle className="h-4 w-4 text-red-600" />
-                        <AlertDescription className="text-red-700">
-                          This campaign would exceed your monthly email limit. You have {monthlyUsage.remaining || 0} emails remaining this month.
-                          <a href="/billing" className="underline ml-1">Upgrade your plan</a> to send more emails.
-                        </AlertDescription>
-                      </Alert>
-                    ) : recipientCount > (monthlyUsage.remaining || 0) * 0.8 ? (
-                      <Alert className="border-yellow-200 bg-yellow-50">
-                        <AlertCircle className="h-4 w-4 text-yellow-600" />
-                        <AlertDescription className="text-yellow-700">
-                          You're approaching your monthly email limit. {monthlyUsage.remaining || 0} emails remaining this month.
-                        </AlertDescription>
-                      </Alert>
-                    ) : null}
-                  </div>
-                )}
+
                 {recipientCount === 0 && formData.targetTags.length > 0 && (
                   <Alert className="border-yellow-200 bg-yellow-50 mt-2">
                     <AlertCircle className="h-4 w-4 text-yellow-600" />

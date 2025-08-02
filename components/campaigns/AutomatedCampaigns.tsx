@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +13,16 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   Play, 
   Pause, 
@@ -75,6 +86,8 @@ export function AutomatedCampaigns() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
 
   // Real data queries from backend
   const eventCampaigns = useQuery(api.eventCampaigns.getEventCampaigns);
@@ -202,10 +215,24 @@ export function AutomatedCampaigns() {
   }, [toggleCampaignStatus]);
 
   const handleDelete = useCallback(async (campaignId: string) => {
-    if (confirm('Are you sure you want to delete this automated campaign?')) {
-      await deleteCampaign({ campaignId });
+    setCampaignToDelete(campaignId);
+    setDeleteDialogOpen(true);
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    if (!campaignToDelete) return;
+    
+    try {
+      await deleteCampaign({ campaignId: campaignToDelete });
+      toast.success('Automated campaign deleted successfully');
+    } catch (error) {
+      console.error('Failed to delete campaign:', error);
+      toast.error('Failed to delete campaign');
+    } finally {
+      setDeleteDialogOpen(false);
+      setCampaignToDelete(null);
     }
-  }, [deleteCampaign]);
+  }, [deleteCampaign, campaignToDelete]);
 
   // Campaign card component
   const CampaignCard = useCallback(({ campaign }: { campaign: AutomatedCampaign }) => {
@@ -505,6 +532,27 @@ export function AutomatedCampaigns() {
           />
         )}
       </div>
+
+      {/* Delete Campaign Alert Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Automated Campaign</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this automated campaign? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ErrorBoundary>
   );
 }

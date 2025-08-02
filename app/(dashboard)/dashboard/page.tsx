@@ -67,10 +67,6 @@ export default function DashboardPage() {
 
   // Handle navigation functions
   const handleCreateCampaign = () => {
-    if (!monthlyUsage?.canSend) {
-      alert("You've reached your monthly email limit. Please upgrade your plan to send more emails.")
-      return
-    }
     router.push('/campaigns?action=create')
   }
 
@@ -82,10 +78,6 @@ export default function DashboardPage() {
     router.push('/templates?action=create')
   }
 
-  const handleUpgradePlan = () => {
-    router.push('/billing')
-  }
-
   return (
     <div className="space-y-6">
       {/* Page header */}
@@ -95,31 +87,6 @@ export default function DashboardPage() {
           Welcome back! Here&apos;s what&apos;s happening with your email campaigns.
         </p>
       </div>
-
-      {/* Email Usage Alert for Free Plan */}
-      {monthlyUsage?.plan === 'free' && monthlyUsage?.usagePercentage > 80 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <AlertTriangle className="h-5 w-5 text-yellow-600 mr-3" />
-            <div className="flex-1">
-              <h3 className="text-sm font-medium text-yellow-800">
-                Approaching Email Limit
-              </h3>
-              <p className="text-sm text-yellow-700 mt-1">
-                You've used {monthlyUsage.usage} of {monthlyUsage.limit} emails this month. 
-                Consider upgrading to send more emails.
-              </p>
-            </div>
-            <Button 
-              size="sm" 
-              onClick={handleUpgradePlan}
-              className="bg-yellow-600 hover:bg-yellow-700"
-            >
-              Upgrade Plan
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -176,17 +143,13 @@ export default function DashboardPage() {
           <div className="space-y-3">
             <button 
               onClick={handleCreateCampaign}
-              disabled={!monthlyUsage?.canSend}
-              className="w-full text-left p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full text-left p-3 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors"
             >
               <div className="flex items-center">
                 <Mail className="h-5 w-5 text-blue-500 mr-3" />
                 <div>
                   <p className="font-medium">Create New Campaign</p>
                   <p className="text-sm text-gray-600">Design and send email campaigns</p>
-                  {!monthlyUsage?.canSend && (
-                    <p className="text-xs text-red-500 mt-1">Monthly limit reached</p>
-                  )}
                 </div>
               </div>
             </button>
@@ -214,45 +177,6 @@ export default function DashboardPage() {
                 </div>
               </div>
             </button>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Account Status</h3>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Plan</span>
-              <Badge variant={monthlyUsage?.plan === 'free' ? 'secondary' : 'default'}>
-                {monthlyUsage?.plan?.charAt(0).toUpperCase() + monthlyUsage?.plan?.slice(1) || 'Free'}
-              </Badge>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Emails sent this month</span>
-              <span className="font-medium">
-                {monthlyUsage?.usage || 0} / {monthlyUsage?.limit || 10}
-              </span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  (monthlyUsage?.usagePercentage || 0) > 90 
-                    ? 'bg-red-600' 
-                    : (monthlyUsage?.usagePercentage || 0) > 75 
-                      ? 'bg-yellow-600' 
-                      : 'bg-blue-600'
-                }`}
-                style={{ width: `${Math.min(monthlyUsage?.usagePercentage || 0, 100)}%` }}
-              ></div>
-            </div>
-            <div className="text-xs text-gray-500">
-              {monthlyUsage?.remaining || 0} emails remaining this month
-            </div>
-            <Button 
-              onClick={handleUpgradePlan}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-            >
-              Upgrade Plan
-            </Button>
           </div>
         </div>
       </div>

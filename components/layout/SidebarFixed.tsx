@@ -94,19 +94,6 @@ function DesktopSidebar({ className }: { className?: string }) {
                 })}
               </ul>
             </li>
-            
-            <li className="mt-auto">
-              <Separator className="my-4" />
-              <div className="rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
-                <h4 className="text-sm font-semibold text-gray-900">Upgrade to Pro</h4>
-                <p className="mt-1 text-xs text-gray-600">
-                  Unlock advanced features and unlimited campaigns
-                </p>
-                <Button className="mt-3 w-full" size="sm">
-                  Upgrade Now
-                </Button>
-              </div>
-            </li>
           </ul>
         </nav>
       </div>
@@ -175,19 +162,6 @@ function MobileSidebar() {
                     );
                   })}
                 </ul>
-              </li>
-              
-              <li className="mt-auto">
-                <Separator className="my-4" />
-                <div className="rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
-                  <h4 className="text-sm font-semibold text-gray-900">Upgrade to Pro</h4>
-                  <p className="mt-1 text-xs text-gray-600">
-                    Unlock advanced features and unlimited campaigns
-                  </p>
-                  <Button className="mt-3 w-full" size="sm">
-                    Upgrade Now
-                  </Button>
-                </div>
               </li>
             </ul>
           </nav>

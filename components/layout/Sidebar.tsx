@@ -13,9 +13,7 @@ import {
   Filter,
   Calendar,
   Brain,
-  Globe,
-  CreditCard
-  
+  Globe
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -56,7 +54,6 @@ const navigation: NavItem[] = [
   { name: 'Integrations', href: '/integrations', icon: Globe },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'AI Assistant', href: '/ai', icon: Brain },
-  { name: 'Billing', href: '/billing', icon: CreditCard },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
@@ -148,19 +145,6 @@ function DesktopSidebar({ className }: { className?: string }) {
                   );
                 })}
               </ul>
-            </li>
-            
-            <li className="mt-auto">
-              <Separator className="my-4" />
-              <div className="rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
-                <h4 className="text-sm font-semibold text-gray-900">Upgrade to Pro</h4>
-                <p className="mt-1 text-xs text-gray-600">
-                  Unlock advanced features and unlimited campaigns
-                </p>
-                <Button asChild className="mt-3 w-full" size="sm">
-                  <Link href="/billing">Upgrade Now</Link>
-                </Button>
-              </div>
             </li>
           </ul>
         </nav>
@@ -260,19 +244,6 @@ function MobileSidebar() {
                     );
                   })}
                 </ul>
-              </li>
-              
-              <li className="mt-auto">
-                <Separator className="my-4" />
-                <div className="rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
-                  <h4 className="text-sm font-semibold text-gray-900">Upgrade to Pro</h4>
-                  <p className="mt-1 text-xs text-gray-600">
-                    Unlock advanced features and unlimited campaigns
-                  </p>
-                  <Button asChild className="mt-3 w-full" size="sm">
-                    <Link href="/billing">Upgrade Now</Link>
-                  </Button>
-                </div>
               </li>
             </ul>
           </nav>
