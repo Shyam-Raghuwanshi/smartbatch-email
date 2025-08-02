@@ -10,6 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { 
   Mail, 
   Clock, 
@@ -27,7 +30,9 @@ import {
   Pause,
   Edit,
   Trash2,
-  Copy
+  Copy,
+  Save,
+  Eye
 } from 'lucide-react';
 
 interface WorkflowNode {
@@ -108,61 +113,76 @@ const nodeTypes = [
 ];
 
 export default function DripCampaignBuilder() {
-  const [campaigns, setCampaigns] = useState<DripCampaign[]>([
-    {
-      id: '1',
-      name: 'Welcome Series',
-      description: 'Onboard new subscribers with a 5-email sequence',
-      status: 'active',
-      trigger: {
-        type: 'signup',
-        config: { source: 'newsletter' }
-      },
-      nodes: [
-        {
-          id: 'trigger-1',
-          type: 'trigger',
-          position: { x: 100, y: 50 },
-          data: {
-            title: 'New Subscriber',
-            description: 'Newsletter signup',
-            config: { source: 'newsletter' }
-          },
-          connections: ['email-1']
+  // Backend queries
+  const workflows = useQuery(api.workflows.getUserWorkflows);
+  const templates = useQuery(api.templates.getTemplatesByUser);
+  const contacts = useQuery(api.contacts.getContactsByUser);
+  
+  // Mutations
+  const createWorkflow = useMutation(api.workflows.createWorkflow);
+  const updateWorkflow = useMutation(api.workflows.updateWorkflow);
+  const deleteWorkflow = useMutation(api.workflows.deleteWorkflow);
+
+  // Convert backend workflows to DripCampaign format
+  const campaigns = React.useMemo(() => {
+    if (!workflows) return [];
+    
+    return workflows
+      .filter((w: any) => w.type === 'drip' || w.type === 'email_sequence')
+      .map((workflow: any) => ({
+        id: workflow._id,
+        name: workflow.name,
+        description: workflow.description || '',
+        status: workflow.status as 'draft' | 'active' | 'paused' | 'completed',
+        trigger: {
+          type: workflow.triggers?.[0]?.event || 'signup',
+          config: workflow.triggers?.[0]?.config || {}
         },
-        {
-          id: 'email-1',
-          type: 'email',
-          position: { x: 100, y: 150 },
+        nodes: workflow.steps?.map((step: any, index: number) => ({
+          id: step.id || `step-${index}`,
+          type: step.type || 'action',
+          position: { x: 100, y: index * 120 + 50 },
           data: {
-            title: 'Welcome Email',
-            description: 'Introduce your brand',
-            config: { template: 'welcome-intro', subject: 'Welcome to our community!' }
+            title: step.name || `Step ${index + 1}`,
+            description: step.description,
+            config: step.config || {}
           },
-          connections: ['delay-1']
-        }
-      ],
-      settings: {
-        timezone: 'America/New_York',
-        respectQuietHours: true,
-        quietHours: { start: '22:00', end: '08:00' },
-        frequency: 'immediate'
-      },
-      stats: {
-        subscribers: 1247,
-        sent: 1247,
-        opens: 856,
-        clicks: 234,
-        conversions: 89
-      },
-      createdAt: new Date('2024-01-15'),
-      updatedAt: new Date('2024-01-20')
-    }
-  ]);
+          connections: step.nextSteps || []
+        })) || [
+          {
+            id: 'trigger-1',
+            type: 'trigger',
+            position: { x: 100, y: 50 },
+            data: {
+              title: 'Campaign Trigger',
+              description: 'When to start this campaign',
+              config: {}
+            },
+            connections: []
+          }
+        ],
+        settings: {
+          timezone: workflow.settings?.timezone || 'America/New_York',
+          respectQuietHours: workflow.settings?.respectQuietHours || true,
+          quietHours: workflow.settings?.quietHours || { start: '22:00', end: '08:00' },
+          frequency: workflow.settings?.frequency || 'immediate'
+        },
+        stats: {
+          subscribers: 0, // Would come from executions
+          sent: 0,
+          opens: 0,
+          clicks: 0,
+          conversions: 0
+        },
+        createdAt: new Date(workflow.createdAt),
+        updatedAt: new Date(workflow.updatedAt)
+      }));
+  }, [workflows]);
 
   const [selectedCampaign, setSelectedCampaign] = useState<DripCampaign | null>(null);
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [selectedNode, setSelectedNode] = useState<WorkflowNode | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
 
   const openBuilder = (campaign?: DripCampaign) => {
     if (campaign) {
@@ -170,7 +190,7 @@ export default function DripCampaignBuilder() {
     } else {
       // Create new campaign
       const newCampaign: DripCampaign = {
-        id: Date.now().toString(),
+        id: 'new-' + Date.now().toString(),
         name: 'New Drip Campaign',
         description: '',
         status: 'draft',
@@ -186,7 +206,7 @@ export default function DripCampaignBuilder() {
             data: {
               title: 'Campaign Trigger',
               description: 'When to start this campaign',
-              config: {}
+              config: { event: 'contact_created' }
             },
             connections: []
           }
@@ -252,315 +272,185 @@ export default function DripCampaignBuilder() {
     });
   };
 
-  const saveCampaign = () => {
+  const saveCampaign = async () => {
     if (!selectedCampaign) return;
+    
+    setIsCreating(true);
+    try {
+      const workflowData = {
+        name: selectedCampaign.name,
+        description: selectedCampaign.description,
+        trigger: {
+          type: 'custom' as const,
+          configuration: selectedCampaign.trigger.config
+        },
+        actions: selectedCampaign.nodes.map((node, index) => ({
+          type: 'custom' as const,
+          configuration: {
+            nodeId: node.id,
+            nodeType: node.type,
+            title: node.data.title,
+            description: node.data.description,
+            config: node.data.config,
+            nextSteps: node.connections
+          },
+          order: index
+        }))
+      };
 
-    const isNew = !campaigns.find(c => c.id === selectedCampaign.id);
-    
-    if (isNew) {
-      setCampaigns([...campaigns, selectedCampaign]);
-    } else {
-      setCampaigns(campaigns.map(c => 
-        c.id === selectedCampaign.id ? { ...selectedCampaign, updatedAt: new Date() } : c
-      ));
+      if (selectedCampaign.id.startsWith('new-')) {
+        // Create new workflow
+        await createWorkflow(workflowData);
+      } else {
+        // Update existing workflow
+        await updateWorkflow({
+          workflowId: selectedCampaign.id as any as any,
+          trigger: workflowData.trigger,
+          name: workflowData.name,
+          description: workflowData.description,
+          actions: workflowData.actions
+        });
+      }
+      
+      setIsBuilderOpen(false);
+      setSelectedCampaign(null);
+    } catch (error) {
+      console.error('Failed to save campaign:', error);
+    } finally {
+      setIsCreating(false);
     }
-    
-    setIsBuilderOpen(false);
-    setSelectedCampaign(null);
   };
 
   if (isBuilderOpen && selectedCampaign) {
     return (
-      <div className="h-full flex flex-col">
-        {/* Builder Header */}
-        <div className="flex items-center justify-between p-4 border-b bg-white">
-          <div className="flex items-center space-x-4">
-            <Button 
-              variant="outline" 
-              onClick={() => setIsBuilderOpen(false)}
-            >
-              ← Back to Campaigns
-            </Button>
-            <div>
-              <h2 className="text-xl font-bold">{selectedCampaign.name}</h2>
-              <p className="text-sm text-muted-foreground">Visual Workflow Editor</p>
+      <div className="h-full flex flex-col bg-gray-50">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button variant="outline" onClick={() => setIsBuilderOpen(false)}>
+                ← Back to Campaigns
+              </Button>
+              <div>
+                <h1 className="text-xl font-semibold">{selectedCampaign.name}</h1>
+                <p className="text-sm text-gray-500">Visual Workflow Editor</p>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Badge variant={selectedCampaign.status === 'active' ? 'default' : 'secondary'}>
-              {selectedCampaign.status}
-            </Badge>
-            <Button variant="outline" size="sm">
-              <Play className="h-4 w-4 mr-2" />
-              Test
-            </Button>
-            <Button onClick={saveCampaign}>
-              Save Campaign
-            </Button>
+            <div className="flex items-center space-x-3">
+              <Badge 
+                variant={selectedCampaign.status === 'active' ? 'default' : 'secondary'}
+                className="capitalize"
+              >
+                {selectedCampaign.status}
+              </Badge>
+              <Button variant="outline" size="sm">
+                <Play className="h-4 w-4 mr-2" />
+                Test
+              </Button>
+              <Button onClick={saveCampaign} disabled={isCreating}>
+                <Save className="h-4 w-4 mr-2" />
+                {isCreating ? 'Saving...' : 'Save Campaign'}
+              </Button>
+            </div>
           </div>
         </div>
 
+        {/* Main Content */}
         <div className="flex-1 flex">
-          {/* Workflow Canvas */}
-          <div className="flex-1 bg-gray-50 relative overflow-auto">
-            <div className="absolute inset-0 p-6">
-              <div className="relative h-full">
-                {selectedCampaign.nodes.map((node) => {
-                  const nodeType = nodeTypes.find(t => t.type === node.type);
-                  const Icon = nodeType?.icon || Mail;
-                  
-                  return (
-                    <div
-                      key={node.id}
-                      className={`absolute w-64 p-4 bg-white border-2 rounded-lg shadow-sm cursor-pointer hover:shadow-md transition-shadow ${
-                        selectedNode?.id === node.id ? 'ring-2 ring-blue-500' : ''
-                      } ${nodeType?.color || 'bg-gray-100 border-gray-300'}`}
-                      style={{
-                        left: node.position.x,
-                        top: node.position.y
-                      }}
-                      onClick={() => setSelectedNode(node)}
-                    >
-                      <div className="flex items-center space-x-2 mb-2">
-                        <Icon className="h-5 w-5" />
-                        <span className="font-medium text-sm">{node.data.title}</span>
-                      </div>
-                      {node.data.description && (
-                        <p className="text-xs text-muted-foreground mb-2">
-                          {node.data.description}
-                        </p>
-                      )}
-                      
-                      {/* Node specific content */}
-                      {node.type === 'email' && (
-                        <div className="text-xs space-y-1">
-                          <div>Subject: {node.data.config.subject || 'Not set'}</div>
-                          <div>Template: {node.data.config.template || 'Not set'}</div>
-                        </div>
-                      )}
-                      
-                      {node.type === 'delay' && (
-                        <div className="text-xs">
-                          Wait: {node.data.config.duration || '1'} {node.data.config.unit || 'days'}
-                        </div>
-                      )}
-                      
-                      {node.type === 'condition' && (
-                        <div className="text-xs">
-                          If: {node.data.config.condition || 'Not set'}
-                        </div>
-                      )}
-
-                      {/* Connection points */}
-                      {node.connections.length > 0 && (
-                        <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
-                          <ArrowDown className="h-4 w-4 text-gray-400" />
-                        </div>
-                      )}
+          {/* Canvas Area */}
+          <div className="flex-1 p-8">
+            <div className="max-w-md mx-auto">
+              {/* Campaign Trigger Node */}
+              <Card className="border-2 border-blue-300 bg-blue-50">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-2 bg-blue-500 rounded-md">
+                      <Zap className="h-5 w-5 text-white" />
                     </div>
-                  );
-                })}
-              </div>
+                    <CardTitle className="text-lg">Campaign Trigger</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-600 mb-3">
+                    When to start this campaign
+                  </p>
+                  <div className="p-3 bg-white rounded border">
+                    <div className="text-sm font-medium">
+                      Event: {selectedCampaign.trigger.type.replace('_', ' ').charAt(0).toUpperCase() + selectedCampaign.trigger.type.slice(1)}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Triggers when a new {selectedCampaign.trigger.type} occurs
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
 
-          {/* Properties Panel */}
-          <div className="w-80 bg-white border-l">
+          {/* Workflow Elements Panel */}
+          <div className="w-80 bg-white border-l border-gray-200 p-6">
             <Tabs defaultValue="nodes" className="h-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="nodes">Add Nodes</TabsTrigger>
                 <TabsTrigger value="properties">Properties</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="nodes" className="p-4 space-y-4">
+              <TabsContent value="nodes" className="mt-6">
                 <div>
-                  <h4 className="font-medium mb-3">Workflow Elements</h4>
-                  <div className="space-y-2">
+                  <h4 className="font-medium mb-4">Workflow Elements</h4>
+                  <div className="space-y-3">
                     {nodeTypes.map((nodeType) => {
                       const Icon = nodeType.icon;
                       return (
-                        <Button
+                        <div
                           key={nodeType.type}
-                          variant="outline"
-                          className="w-full justify-start"
+                          className="flex items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
                           onClick={() => addNode(nodeType.type)}
                         >
-                          <Icon className="h-4 w-4 mr-2" />
-                          {nodeType.label}
-                        </Button>
+                          <div className={`p-2 rounded-md ${nodeType.color} text-white mr-3`}>
+                            <Icon className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium text-sm">{nodeType.label}</div>
+                            <div className="text-xs text-gray-500">{nodeType.description}</div>
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
                 </div>
-
-                <div>
-                  <h4 className="font-medium mb-3">Pre-built Sequences</h4>
-                  <div className="space-y-2">
-                    <Button variant="outline" className="w-full justify-start" size="sm">
-                      <Mail className="h-4 w-4 mr-2" />
-                      Welcome Series
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start" size="sm">
-                      <Target className="h-4 w-4 mr-2" />
-                      Nurture Sequence
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start" size="sm">
-                      <Users className="h-4 w-4 mr-2" />
-                      Re-engagement
-                    </Button>
-                  </div>
-                </div>
               </TabsContent>
 
-              <TabsContent value="properties" className="p-4 space-y-4">
-                {selectedNode ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium">Node Properties</h4>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => deleteNode(selectedNode.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="node-title">Title</Label>
-                      <Input
-                        id="node-title"
-                        value={selectedNode.data.title}
-                        onChange={(e) => updateNode(selectedNode.id, {
-                          data: { ...selectedNode.data, title: e.target.value }
-                        })}
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="node-description">Description</Label>
-                      <Textarea
-                        id="node-description"
-                        value={selectedNode.data.description || ''}
-                        onChange={(e) => updateNode(selectedNode.id, {
-                          data: { ...selectedNode.data, description: e.target.value }
-                        })}
-                        rows={2}
-                      />
-                    </div>
-
-                    {/* Node-specific configuration */}
-                    {selectedNode.type === 'email' && (
-                      <div className="space-y-3">
-                        <div>
-                          <Label>Email Subject</Label>
-                          <Input
-                            value={selectedNode.data.config.subject || ''}
-                            onChange={(e) => updateNode(selectedNode.id, {
-                              data: {
-                                ...selectedNode.data,
-                                config: { ...selectedNode.data.config, subject: e.target.value }
-                              }
-                            })}
-                            placeholder="Enter email subject"
-                          />
-                        </div>
-                        <div>
-                          <Label>Template</Label>
-                          <Select
-                            value={selectedNode.data.config.template || ''}
-                            onValueChange={(value) => updateNode(selectedNode.id, {
-                              data: {
-                                ...selectedNode.data,
-                                config: { ...selectedNode.data.config, template: value }
-                              }
-                            })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select template" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="welcome">Welcome Template</SelectItem>
-                              <SelectItem value="promotional">Promotional</SelectItem>
-                              <SelectItem value="newsletter">Newsletter</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+              <TabsContent value="properties" className="mt-6">
+                <div>
+                  <h4 className="font-medium mb-4">Properties</h4>
+                  {selectedNode ? (
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Node Title</Label>
+                        <Input 
+                          value={selectedNode.data.title}
+                          onChange={(e) => updateNode(selectedNode.id, {
+                            data: { ...selectedNode.data, title: e.target.value }
+                          })}
+                        />
                       </div>
-                    )}
-
-                    {selectedNode.type === 'delay' && (
-                      <div className="space-y-3">
-                        <div>
-                          <Label>Duration</Label>
-                          <div className="flex space-x-2">
-                            <Input
-                              type="number"
-                              value={selectedNode.data.config.duration || 1}
-                              onChange={(e) => updateNode(selectedNode.id, {
-                                data: {
-                                  ...selectedNode.data,
-                                  config: { ...selectedNode.data.config, duration: e.target.value }
-                                }
-                              })}
-                              className="flex-1"
-                            />
-                            <Select
-                              value={selectedNode.data.config.unit || 'days'}
-                              onValueChange={(value) => updateNode(selectedNode.id, {
-                                data: {
-                                  ...selectedNode.data,
-                                  config: { ...selectedNode.data.config, unit: value }
-                                }
-                              })}
-                            >
-                              <SelectTrigger className="w-24">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="minutes">Min</SelectItem>
-                                <SelectItem value="hours">Hours</SelectItem>
-                                <SelectItem value="days">Days</SelectItem>
-                                <SelectItem value="weeks">Weeks</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
+                      <div>
+                        <Label>Description</Label>
+                        <Textarea 
+                          value={selectedNode.data.description || ''}
+                          onChange={(e) => updateNode(selectedNode.id, {
+                            data: { ...selectedNode.data, description: e.target.value }
+                          })}
+                        />
                       </div>
-                    )}
-
-                    {selectedNode.type === 'condition' && (
-                      <div className="space-y-3">
-                        <div>
-                          <Label>Condition Type</Label>
-                          <Select
-                            value={selectedNode.data.config.type || ''}
-                            onValueChange={(value) => updateNode(selectedNode.id, {
-                              data: {
-                                ...selectedNode.data,
-                                config: { ...selectedNode.data.config, type: value }
-                              }
-                            })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select condition" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="email_opened">Email Opened</SelectItem>
-                              <SelectItem value="link_clicked">Link Clicked</SelectItem>
-                              <SelectItem value="tag_added">Tag Added</SelectItem>
-                              <SelectItem value="custom_field">Custom Field</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    Select a node to edit its properties
-                  </div>
-                )}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500">
+                      Select a node to edit its properties
+                    </div>
+                  )}
+                </div>
               </TabsContent>
             </Tabs>
           </div>
@@ -586,7 +476,7 @@ export default function DripCampaignBuilder() {
 
       {/* Campaign List */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {campaigns.map((campaign) => (
+        {campaigns.map((campaign: any) => (
           <Card key={campaign.id} className="hover:shadow-md transition-shadow">
             <CardHeader>
               <div className="flex items-start justify-between">
@@ -680,5 +570,6 @@ export default function DripCampaignBuilder() {
           </Button>
         </div>
       )}
-    </div>  );
+    </div>
+  );
 }

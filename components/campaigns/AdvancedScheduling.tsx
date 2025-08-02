@@ -11,7 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Calendar } from '@/components/ui/calendar';
-import { TimePicker } from '@/components/ui/time-picker';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { 
   Calendar as CalendarIcon, 
   Clock, 
@@ -84,19 +85,45 @@ interface FrequencyCapping {
 
 export default function AdvancedScheduling() {
   const [activeTab, setActiveTab] = useState('seasonal');
-  const [schedulingRules, setSchedulingRules] = useState<SchedulingRule[]>([]);
-  const [seasonalCampaigns, setSeasonalCampaigns] = useState<SeasonalCampaign[]>([
-    {
-      id: '1',
-      name: 'Black Friday Campaign',
-      season: 'fall',
-      startDate: new Date('2024-11-01'),
-      endDate: new Date('2024-11-30'),
-      timezone: 'America/New_York',
-      frequency: 'weekly',
-      targetAudience: ['high_value_customers', 'engaged_subscribers']
-    }
-  ]);
+  
+  // Backend queries
+  const campaigns = useQuery(api.campaigns.getCampaignsByUser);
+  const scheduleSettings = useQuery(api.emailScheduler.getScheduleEntriesWithCampaigns);
+  const ispRates = useQuery(api.emailScheduler.getISPSendRates, { contactEmails: [] });
+  
+  // Mutations
+  const updateScheduleSettings = useMutation(api.emailScheduler.updateCampaignScheduleSettings);
+  const createCampaignSchedule = useMutation(api.emailScheduler.createCampaignSchedule);
+
+  // Derive scheduling data from campaigns
+  const schedulingRules = React.useMemo(() => {
+    return campaigns?.filter(c => c.scheduleSettings).map(campaign => ({
+      id: campaign._id,
+      name: campaign.name,
+      type: campaign.scheduleSettings?.type || 'immediate',
+      config: campaign.scheduleSettings || {},
+      isActive: campaign.status === 'scheduled' || campaign.status === 'sending',
+      priority: 5,
+      campaigns: [campaign._id],
+      createdAt: new Date(campaign.createdAt)
+    })) || [];
+  }, [campaigns]);
+
+  const seasonalCampaigns = React.useMemo(() => {
+    return campaigns?.filter(c => 
+      c.scheduleSettings?.type === 'recurring' && 
+      c.scheduleSettings?.recurring?.pattern === 'monthly'
+    ).map(campaign => ({
+      id: campaign._id,
+      name: campaign.name,
+      season: 'fall' as const, // Could be derived from campaign name or tags
+      startDate: new Date(campaign.scheduledAt || Date.now()),
+      endDate: new Date((campaign.scheduledAt || Date.now()) + 30 * 24 * 60 * 60 * 1000),
+      timezone: campaign.scheduleSettings?.timezone || 'America/New_York',
+      frequency: campaign.scheduleSettings?.recurring?.pattern || 'weekly',
+      targetAudience: campaign.settings.targetTags || []
+    })) || [];
+  }, [campaigns]);
 
   const [timezoneOptimization, setTimezoneOptimization] = useState<TimezoneOptimization>({
     id: '1',

@@ -101,13 +101,24 @@ export const createEmailTrigger = mutation({
 });
 
 export const getEmailTriggers = query({
-  args: {
-    userId: v.id("users")
-  },
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    
+    if (!user) {
+      throw new Error("User not found");
+    }
+
     return await ctx.db
       .query("emailTriggers")
-      .filter(q => q.eq(q.field("userId"), args.userId))
+      .filter(q => q.eq(q.field("userId"), user._id))
       .order("desc")
       .collect();
   }

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation } from 'convex/react';
+import { useUser } from '@clerk/nextjs';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { Button } from '@/components/ui/button';
@@ -24,21 +25,17 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import {
   Plus,
   Search,
-  Filter,
   MoreHorizontal,
   Edit,
   Copy,
   Trash2,
   Eye,
   FileText,
-  Palette,
   Star,
-  Clock,
   Users,
   TrendingUp,
-  Mail,
   Layout,
-  Zap,
+  Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -214,6 +211,7 @@ const PRE_BUILT_TEMPLATES = [
 
 export default function TemplatesPage() {
   const router = useRouter();
+  const { isSignedIn, user } = useUser();
   const templates = useQuery(api.templates.getTemplatesByUser);
   const publicTemplates = useQuery(api.templates.getPublicTemplates);
   const categories = useQuery(api.templates.getCategories);
@@ -229,6 +227,7 @@ export default function TemplatesPage() {
   const [activeTab, setActiveTab] = useState('my-templates');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewTemplate, setPreviewTemplate] = useState<typeof templates extends Array<infer T> ? T : null>(null);
+  const [loadingTemplateId, setLoadingTemplateId] = useState<string | null>(null);
 
   // Filter templates based on search and filters
   const filteredTemplates = (templates || []).filter(template => {
@@ -271,7 +270,19 @@ export default function TemplatesPage() {
   };
 
   const handleUsePrebuiltTemplate = async (template: typeof PRE_BUILT_TEMPLATES[0]) => {
+    // Check if user is authenticated
+    if (!isSignedIn || !user) {
+      toast.error('Please sign in to use templates');
+      router.push('/sign-in');
+      return;
+    }
+
+    setLoadingTemplateId(template.id);
+
     try {
+      console.log('Creating template with data:', template);
+      console.log('User authenticated:', isSignedIn, user?.id);
+      
       const templateId = await createTemplate({
         name: template.name,
         subject: template.subject,
@@ -290,11 +301,15 @@ export default function TemplatesPage() {
         }
       });
       
+      console.log('Template created with ID:', templateId);
       toast.success('Template added to your library');
       router.push(`/templates/editor?id=${templateId}`);
     } catch (error) {
       console.error('Failed to create template:', error);
-      toast.error('Failed to create template');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast.error(`Failed to create template: ${errorMessage}`);
+    } finally {
+      setLoadingTemplateId(null);
     }
   };
 
@@ -406,9 +421,19 @@ export default function TemplatesPage() {
                 size="sm"
                 onClick={() => handleUsePrebuiltTemplate(template)}
                 className="flex-1"
+                disabled={loadingTemplateId === template.id}
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Use Template
+                {loadingTemplateId === template.id ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Use Template
+                  </>
+                )}
               </Button>
             ) : (
               <>

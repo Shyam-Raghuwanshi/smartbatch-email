@@ -25,7 +25,6 @@ import { cn } from "@/lib/utils";
 import { KPIDashboard } from '@/components/analytics/KPIDashboard';
 import { PerformanceTrends } from '@/components/analytics/PerformanceTrends';
 import { AudienceInsights } from '@/components/analytics/AudienceInsights';
-import { RevenueAttribution } from '@/components/analytics/RevenueAttribution';
 import CampaignComparison from '@/components/analytics/CampaignComparison';
 import { SubscriberBehavior } from '@/components/analytics/SubscriberBehavior';
 import DeliverabilityReports from '@/components/analytics/DeliverabilityReports';
@@ -140,7 +139,7 @@ function AnalyticsPage() {
 
       {/* Main Analytics Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-8">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Overview
@@ -152,10 +151,6 @@ function AnalyticsPage() {
           <TabsTrigger value="audience" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Audience
-          </TabsTrigger>
-          <TabsTrigger value="revenue" className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4" />
-            Revenue
           </TabsTrigger>
           <TabsTrigger value="campaigns" className="flex items-center gap-2">
             <Target className="h-4 w-4" />
@@ -188,11 +183,6 @@ function AnalyticsPage() {
         {/* Audience Tab - Engagement and Demographics */}
         <TabsContent value="audience" className="space-y-6">
           <AudienceInsights dateRange={dateRange} />
-        </TabsContent>
-        
-        {/* Revenue Tab - E-commerce Attribution */}
-        <TabsContent value="revenue" className="space-y-6">
-          <RevenueAttribution dateRange={dateRange} />
         </TabsContent>
         
         {/* Campaigns Tab - Comparison and Analysis */}

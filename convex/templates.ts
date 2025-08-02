@@ -1,6 +1,38 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
+// Ensure user exists
+export const ensureUser = mutation({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    
+    let user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    
+    // Create user if doesn't exist
+    if (!user) {
+      const userId = await ctx.db.insert("users", {
+        clerkId: identity.subject,
+        email: identity.email || "user@example.com",
+        name: identity.name || "User",
+        subscription: {
+          plan: "free",
+          status: "active"
+        },
+        createdAt: Date.now(),
+      });
+      user = await ctx.db.get(userId);
+    }
+
+    return user;
+  },
+});
+
 // Create template
 export const createTemplate = mutation({
   args: {
@@ -30,13 +62,28 @@ export const createTemplate = mutation({
       throw new Error("Not authenticated");
     }
     
-    const user = await ctx.db
+    let user = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .unique();
     
+    // Create user if doesn't exist
     if (!user) {
-      throw new Error("User not found");
+      const userId = await ctx.db.insert("users", {
+        clerkId: identity.subject,
+        email: identity.email || "user@example.com",
+        name: identity.name || "User",
+        subscription: {
+          plan: "free",
+          status: "active"
+        },
+        createdAt: Date.now(),
+      });
+      user = await ctx.db.get(userId);
+    }
+
+    if (!user) {
+      throw new Error("Failed to create or retrieve user");
     }
 
     const templateId = await ctx.db.insert("templates", {
@@ -55,7 +102,7 @@ export const getTemplatesByUser = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("Not authenticated");
+      return [];
     }
     
     const user = await ctx.db
@@ -64,7 +111,7 @@ export const getTemplatesByUser = query({
       .unique();
     
     if (!user) {
-      throw new Error("User not found");
+      return [];
     }
 
     return await ctx.db
