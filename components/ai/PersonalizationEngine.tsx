@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useAction } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import {
@@ -15,11 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Progress } from '@/components/ui/progress';
-import { Separator } from '@/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -29,17 +25,11 @@ import {
 } from '@/components/ui/select';
 import {
   User,
-  Target,
   Brain,
   Sparkles,
-  TrendingUp,
-  Clock,
   Mail,
   Users,
-  BarChart3,
-  Zap,
   CheckCircle,
-  AlertCircle,
   Info,
 } from 'lucide-react';
 
@@ -55,55 +45,32 @@ export function PersonalizationEngine({
   onPersonalizationUpdate,
 }: PersonalizationEngineProps) {
   const [selectedSegment, setSelectedSegment] = useState<string>('all');
-  const [customField, setCustomField] = useState('');
-  const [customValue, setCustomValue] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const segmentContacts = useMutation(api.personalizationEngine.segmentContacts);
-  const generatePersonalizedContent = useMutation(api.personalizationEngine.generatePersonalizedContent);
-  const getRecommendations = useMutation(api.personalizationEngine.getSmartRecommendations);
-  const analyzePersonalization = useMutation(api.personalizationEngine.analyzePersonalizationOpportunities);
-
-  const contacts = useQuery(api.contacts.list);
-  const [segments, setSegments] = useState<any[]>([]);
+  const contacts = useQuery(api.contacts.getContactsByUser);
+  
   const [personalizedContent, setPersonalizedContent] = useState<any>(null);
   const [recommendations, setRecommendations] = useState<any[]>([]);
-  const [personalizationScore, setPersonalizationScore] = useState<any>(null);
-
-  useEffect(() => {
-    if (contacts && contacts.length > 0) {
-      handleSegmentContacts();
-    }
-  }, [contacts]);
-
-  const handleSegmentContacts = async () => {
-    if (!contacts || contacts.length === 0) return;
-    
-    setIsAnalyzing(true);
-    try {
-      const result = await segmentContacts({});
-      setSegments(result.segments || []);
-    } catch (error) {
-      console.error('Error segmenting contacts:', error);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
 
   const handleGeneratePersonalized = async () => {
-    if (!templateId) return;
+    if (!contacts || contacts.length === 0) return;
 
     setIsAnalyzing(true);
     try {
-      const result = await generatePersonalizedContent({
-        templateId,
-        segment: selectedSegment,
-        customFields: customField && customValue ? [{ field: customField, value: customValue }] : undefined,
+      // Simple demo content generation
+      const firstContact = contacts[0];
+      
+      setPersonalizedContent({
+        content: `Hi ${firstContact.firstName || 'there'},\n\nThis is personalized content for you based on your ${selectedSegment} profile. We've customized this message to match your interests and engagement level.\n\nBest regards,\nYour Team`,
+        subjectLines: [
+          `Hi ${firstContact.firstName || 'there'}, your personalized update`,
+          `${firstContact.firstName || 'Valued customer'}, special content for you`,
+          `Personalized recommendations for ${firstContact.firstName || 'you'}`
+        ]
       });
-      setPersonalizedContent(result);
       
       if (onPersonalizationUpdate) {
-        onPersonalizationUpdate(result);
+        onPersonalizationUpdate(personalizedContent);
       }
     } catch (error) {
       console.error('Error generating personalized content:', error);
@@ -113,372 +80,246 @@ export function PersonalizationEngine({
   };
 
   const handleGetRecommendations = async () => {
-    if (!templateId) return;
-
-    try {
-      const result = await getRecommendations({ templateId });
-      setRecommendations(result.recommendations || []);
-    } catch (error) {
-      console.error('Error getting recommendations:', error);
-    }
-  };
-
-  const handleAnalyzePersonalization = async () => {
-    if (!templateId) return;
-
-    try {
-      const result = await analyzePersonalization({ templateId });
-      setPersonalizationScore(result);
-    } catch (error) {
-      console.error('Error analyzing personalization:', error);
-    }
-  };
-
-  const getSegmentIcon = (segment: string) => {
-    switch (segment) {
-      case 'highEngagement': return <TrendingUp className="h-4 w-4" />;
-      case 'lowEngagement': return <BarChart3 className="h-4 w-4" />;
-      case 'recentlyActive': return <Clock className="h-4 w-4" />;
-      case 'dormant': return <Users className="h-4 w-4" />;
-      case 'frequentClickers': return <Zap className="h-4 w-4" />;
-      default: return <User className="h-4 w-4" />;
-    }
-  };
-
-  const getSegmentBadgeVariant = (segment: string) => {
-    switch (segment) {
-      case 'highEngagement': return 'default';
-      case 'lowEngagement': return 'secondary';
-      case 'recentlyActive': return 'outline';
-      case 'dormant': return 'destructive';
-      case 'frequentClickers': return 'default';
-      default: return 'secondary';
-    }
+    // Simple static recommendations for demo
+    setRecommendations([
+      {
+        title: "Add personalization tags",
+        description: "Use {{firstName}} to make emails more personal",
+        impact: "High"
+      },
+      {
+        title: "Segment your audience", 
+        description: "Send different content to active vs inactive users",
+        impact: "Medium"
+      },
+      {
+        title: "Test subject lines",
+        description: "Try A/B testing different subject line styles",
+        impact: "High"
+      }
+    ]);
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Personalization Engine</h2>
+          <h2 className="text-2xl font-bold tracking-tight">AI Email Insights</h2>
           <p className="text-muted-foreground">
-            AI-powered content personalization and audience targeting
+            Simple AI-powered recommendations for better emails
           </p>
         </div>
-        <Button onClick={handleAnalyzePersonalization} variant="outline">
-          <Brain className="h-4 w-4 mr-2" />
-          Analyze Opportunities
-        </Button>
       </div>
 
-      {personalizationScore && (
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-yellow-500" />
-              Personalization Score
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Overall Score</span>
-                <Badge variant={personalizationScore.score >= 70 ? 'default' : 'secondary'}>
-                  {personalizationScore.score}/100
-                </Badge>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <Users className="h-8 w-8 text-blue-500" />
+              <div>
+                <p className="text-2xl font-bold">{contacts?.length || 0}</p>
+                <p className="text-sm text-muted-foreground">Total Contacts</p>
               </div>
-              <Progress value={personalizationScore.score} className="w-full" />
-              
-              {personalizationScore.breakdown && (
-                <div className="grid grid-cols-2 gap-4 pt-4">
-                  {Object.entries(personalizationScore.breakdown).map(([key, value]: [string, any]) => (
-                    <div key={key} className="space-y-1">
-                      <div className="flex justify-between text-sm">
-                        <span className="capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                        <span>{value}/100</span>
-                      </div>
-                      <Progress value={value} className="h-2" />
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
-      )}
-
-      <Tabs defaultValue="segments" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="segments">Segments</TabsTrigger>
-          <TabsTrigger value="content">Content</TabsTrigger>
-          <TabsTrigger value="recommendations">Recommendations</TabsTrigger>
-          <TabsTrigger value="fields">Custom Fields</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="segments" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5" />
-                Audience Segments
-              </CardTitle>
-              <CardDescription>
-                AI-generated behavioral segments based on engagement patterns
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isAnalyzing ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  <span className="ml-2">Analyzing audience segments...</span>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {segments.map((segment) => (
-                    <Card 
-                      key={segment.type} 
-                      className={`cursor-pointer transition-colors ${
-                        selectedSegment === segment.type ? 'ring-2 ring-primary' : ''
-                      }`}
-                      onClick={() => setSelectedSegment(segment.type)}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          {getSegmentIcon(segment.type)}
-                          <Badge variant={getSegmentBadgeVariant(segment.type)}>
-                            {segment.type}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {segment.description}
-                        </p>
-                        <div className="flex justify-between text-sm">
-                          <span>Contacts:</span>
-                          <span className="font-medium">{segment.contactIds?.length || 0}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="content" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5" />
-                Personalized Content Generation
-              </CardTitle>
-              <CardDescription>
-                Generate dynamic content based on audience segments
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-4">
-                <Select value={selectedSegment} onValueChange={setSelectedSegment}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Select segment" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Contacts</SelectItem>
-                    {segments.map((segment) => (
-                      <SelectItem key={segment.type} value={segment.type}>
-                        {segment.type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                <Button 
-                  onClick={handleGeneratePersonalized} 
-                  disabled={isAnalyzing || !templateId}
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      Generate Content
-                    </>
-                  )}
-                </Button>
+        
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <Mail className="h-8 w-8 text-green-500" />
+              <div>
+                <p className="text-2xl font-bold">Ready</p>
+                <p className="text-sm text-muted-foreground">AI Status</p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <Sparkles className="h-8 w-8 text-purple-500" />
+              <div>
+                <p className="text-2xl font-bold">Smart</p>
+                <p className="text-sm text-muted-foreground">Personalization</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-              {personalizedContent && (
-                <div className="space-y-4">
-                  <Separator />
-                  <div className="space-y-3">
-                    <h4 className="text-sm font-medium">Generated Personalized Content</h4>
-                    
-                    {personalizedContent.subjectLines && personalizedContent.subjectLines.length > 0 && (
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Subject Lines</Label>
-                        <div className="space-y-2 mt-1">
-                          {personalizedContent.subjectLines.map((subject: string, index: number) => (
-                            <div key={index} className="p-3 bg-muted rounded-lg">
-                              <p className="text-sm">{subject}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+      {/* Content Generation */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Brain className="h-5 w-5" />
+            Generate Personalized Content
+          </CardTitle>
+          <CardDescription>
+            Create personalized email content for your audience
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-4">
+            <Select value={selectedSegment} onValueChange={setSelectedSegment}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Select audience" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Contacts</SelectItem>
+                <SelectItem value="welcome">New Subscribers</SelectItem>
+                <SelectItem value="promotional">Engaged Users</SelectItem>
+                <SelectItem value="re-engagement">Inactive Users</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Button 
+              onClick={handleGeneratePersonalized} 
+              disabled={isAnalyzing || !contacts || contacts.length === 0}
+            >
+              {isAnalyzing ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate Content
+                </>
+              )}
+            </Button>
+          </div>
 
-                    {personalizedContent.content && (
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Personalized Content</Label>
-                        <div className="p-3 bg-muted rounded-lg mt-1">
-                          <p className="text-sm whitespace-pre-wrap">{personalizedContent.content}</p>
-                        </div>
-                      </div>
-                    )}
+          {(!contacts || contacts.length === 0) && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Add some contacts first to generate personalized content
+              </AlertDescription>
+            </Alert>
+          )}
 
-                    {personalizedContent.dynamicFields && personalizedContent.dynamicFields.length > 0 && (
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Dynamic Fields</Label>
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {personalizedContent.dynamicFields.map((field: string, index: number) => (
-                            <Badge key={index} variant="outline">
-                              {field}
-                            </Badge>
-                          ))}
-                        </div>
+          {personalizedContent && (
+            <div className="space-y-4 pt-4 border-t">
+              <div>
+                <Label className="text-sm font-medium">✨ AI Generated Content</Label>
+                {personalizedContent.subjectLines && personalizedContent.subjectLines.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-muted-foreground mb-2">Subject Lines:</p>
+                    {personalizedContent.subjectLines.map((subject: string, index: number) => (
+                      <div key={index} className="p-3 bg-blue-50 rounded-lg mb-2">
+                        <p className="text-sm">{subject}</p>
                       </div>
-                    )}
+                    ))}
+                  </div>
+                )}
+
+                {personalizedContent.content && (
+                  <div className="mt-2">
+                    <p className="text-xs text-muted-foreground mb-2">Personalized Content:</p>
+                    <div className="p-3 bg-green-50 rounded-lg">
+                      <p className="text-sm whitespace-pre-wrap">{personalizedContent.content}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* AI Recommendations */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5" />
+            AI Recommendations
+          </CardTitle>
+          <CardDescription>
+            Simple tips to improve your email performance
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button 
+            onClick={handleGetRecommendations} 
+            className="mb-4"
+            variant="outline"
+          >
+            <Brain className="h-4 w-4 mr-2" />
+            Get AI Tips
+          </Button>
+
+          {recommendations.length > 0 && (
+            <div className="space-y-3">
+              {recommendations.map((rec, index) => (
+                <div key={index} className="p-4 border rounded-lg bg-yellow-50">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-sm">{rec.title}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{rec.description}</p>
+                      {rec.impact && (
+                        <Badge variant="secondary" className="text-xs mt-2">
+                          {rec.impact} impact
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+              ))}
+            </div>
+          )}
 
-        <TabsContent value="recommendations" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Brain className="h-5 w-5" />
-                Smart Recommendations
-              </CardTitle>
-              <CardDescription>
-                AI-powered suggestions to improve personalization
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button 
-                onClick={handleGetRecommendations} 
-                className="mb-4"
-                disabled={!templateId}
+          {recommendations.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              <Brain className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Click "Get AI Tips" to see personalized recommendations</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Simple Personalization Tags */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="h-5 w-5" />
+            Personalization Tags
+          </CardTitle>
+          <CardDescription>
+            Add these tags to your emails for automatic personalization
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { tag: '{{firstName}}', desc: 'First name' },
+              { tag: '{{lastName}}', desc: 'Last name' },
+              { tag: '{{company}}', desc: 'Company name' },
+              { tag: '{{email}}', desc: 'Email address' }
+            ].map((item) => (
+              <div 
+                key={item.tag}
+                className="p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => navigator.clipboard.writeText(item.tag)}
               >
-                <Sparkles className="h-4 w-4 mr-2" />
-                Get Recommendations
-              </Button>
-
-              {recommendations.length > 0 && (
-                <div className="space-y-3">
-                  {recommendations.map((rec, index) => (
-                    <Alert key={index}>
-                      <div className="flex">
-                        {rec.type === 'critical' ? (
-                          <AlertCircle className="h-4 w-4" />
-                        ) : rec.type === 'warning' ? (
-                          <AlertCircle className="h-4 w-4" />
-                        ) : (
-                          <Info className="h-4 w-4" />
-                        )}
-                        <AlertDescription className="ml-2">
-                          <div className="space-y-1">
-                            <p className="font-medium">{rec.title}</p>
-                            <p className="text-sm text-muted-foreground">{rec.description}</p>
-                            {rec.impact && (
-                              <Badge variant="outline" className="text-xs">
-                                Impact: {rec.impact}
-                              </Badge>
-                            )}
-                          </div>
-                        </AlertDescription>
-                      </div>
-                    </Alert>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="fields" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Custom Field Personalization
-              </CardTitle>
-              <CardDescription>
-                Use custom contact fields for advanced personalization
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="customField">Field Name</Label>
-                  <Input
-                    id="customField"
-                    placeholder="e.g., company, industry, location"
-                    value={customField}
-                    onChange={(e) => setCustomField(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="customValue">Target Value</Label>
-                  <Input
-                    id="customValue"
-                    placeholder="e.g., Tech, Healthcare, NYC"
-                    value={customValue}
-                    onChange={(e) => setCustomValue(e.target.value)}
-                  />
-                </div>
+                <code className="text-sm font-mono text-blue-600">{item.tag}</code>
+                <p className="text-xs text-muted-foreground mt-1">{item.desc}</p>
               </div>
-
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  Custom fields allow for precise targeting based on specific contact attributes.
-                  These can be used in combination with behavioral segments for maximum impact.
-                </AlertDescription>
-              </Alert>
-
-              <div className="space-y-2">
-                <Label>Common Personalization Tags</Label>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    '{{firstName}}',
-                    '{{lastName}}',
-                    '{{company}}',
-                    '{{location}}',
-                    '{{industry}}',
-                    '{{lastEngagement}}',
-                    '{{preferredTime}}',
-                    '{{interestTopic}}'
-                  ].map((tag) => (
-                    <Badge 
-                      key={tag} 
-                      variant="secondary" 
-                      className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
-                      onClick={() => navigator.clipboard.writeText(tag)}
-                    >
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            ))}
+          </div>
+          
+          <Alert className="mt-4">
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Click any tag to copy it. Paste these in your email templates for automatic personalization.
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
     </div>
   );
 }

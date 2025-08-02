@@ -30,7 +30,7 @@ function SettingsContent() {
   );
   
   // Filter to show only integrations that support polling
-  const pollableIntegrations = integrations?.filter(i => 
+  const pollableIntegrations = integrations?.filter((i:any) => 
     i.type === "google_sheets" && i.status === "connected"
   ) || [];
 
@@ -101,11 +101,10 @@ function SettingsContent() {
         // Update URL to reflect the current tab
         window.history.pushState({}, '', `/settings?tab=${value}`);
       }}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="email">Email Settings</TabsTrigger>
           <TabsTrigger value="integrations">Integration Settings</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="space-y-6">
@@ -145,7 +144,7 @@ function SettingsContent() {
             <CardContent className="space-y-6">
               {pollableIntegrations && pollableIntegrations.length > 0 ? (
                 <div className="space-y-4">
-                  {pollableIntegrations.map((integration) => (
+                  {pollableIntegrations.map((integration:any) => (
                     <IntegrationPollingSettings
                       key={integration._id}
                       integration={integration}
@@ -166,20 +165,6 @@ function SettingsContent() {
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="notifications" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Settings</CardTitle>
-              <CardDescription>
-                Configure how you want to be notified about integration events.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-500">Notification settings coming soon...</p>
             </CardContent>
           </Card>
         </TabsContent>

@@ -55,7 +55,7 @@ const navigation: NavItem[] = [
   },
   { name: 'Integrations', href: '/integrations', icon: Globe },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-  { name: 'AI Insights', href: '/ai', icon: Brain },
+  { name: 'AI Assistant', href: '/ai', icon: Brain },
   { name: 'Billing', href: '/billing', icon: CreditCard },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
@@ -157,8 +157,8 @@ function DesktopSidebar({ className }: { className?: string }) {
                 <p className="mt-1 text-xs text-gray-600">
                   Unlock advanced features and unlimited campaigns
                 </p>
-                <Button className="mt-3 w-full" size="sm">
-                  Upgrade Now
+                <Button asChild className="mt-3 w-full" size="sm">
+                  <Link href="/billing">Upgrade Now</Link>
                 </Button>
               </div>
             </li>
@@ -269,8 +269,8 @@ function MobileSidebar() {
                   <p className="mt-1 text-xs text-gray-600">
                     Unlock advanced features and unlimited campaigns
                   </p>
-                  <Button className="mt-3 w-full" size="sm">
-                    Upgrade Now
+                  <Button asChild className="mt-3 w-full" size="sm">
+                    <Link href="/billing">Upgrade Now</Link>
                   </Button>
                 </div>
               </li>

@@ -10,6 +10,7 @@
 
 import type * as abTesting from "../abTesting.js";
 import type * as analytics from "../analytics.js";
+import type * as analyticsData from "../analyticsData.js";
 import type * as apiCrons from "../apiCrons.js";
 import type * as apiIntegrations from "../apiIntegrations.js";
 import type * as apiKeys from "../apiKeys.js";
@@ -54,6 +55,7 @@ import type * as oauth from "../oauth.js";
 import type * as oauthActions from "../oauthActions.js";
 import type * as optimizedQueries from "../optimizedQueries.js";
 import type * as performanceOptimization from "../performanceOptimization.js";
+import type * as perplexityAI from "../perplexityAI.js";
 import type * as personalizationEngine from "../personalizationEngine.js";
 import type * as rateLimiter from "../rateLimiter.js";
 import type * as rbacSystem from "../rbacSystem.js";
@@ -92,6 +94,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   abTesting: typeof abTesting;
   analytics: typeof analytics;
+  analyticsData: typeof analyticsData;
   apiCrons: typeof apiCrons;
   apiIntegrations: typeof apiIntegrations;
   apiKeys: typeof apiKeys;
@@ -136,6 +139,7 @@ declare const fullApi: ApiFromModules<{
   oauthActions: typeof oauthActions;
   optimizedQueries: typeof optimizedQueries;
   performanceOptimization: typeof performanceOptimization;
+  perplexityAI: typeof perplexityAI;
   personalizationEngine: typeof personalizationEngine;
   rateLimiter: typeof rateLimiter;
   rbacSystem: typeof rbacSystem;
