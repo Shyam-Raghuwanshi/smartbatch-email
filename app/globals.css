@@ -120,3 +120,15 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Toast description text color fix */
+[data-sonner-toaster] [data-description] {
+  color: rgb(100 116 139) !important; /* slate-500 for better readability */
+  opacity: 0.9;
+}
+
+/* Dark theme toast description */
+.dark [data-sonner-toaster] [data-description] {
+  color: rgb(148 163 184) !important; /* slate-400 for dark mode */
+  opacity: 0.9;
+}

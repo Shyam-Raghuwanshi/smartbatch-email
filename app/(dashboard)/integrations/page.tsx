@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
-import { useMutation, useAction } from "convex/react";
+import { useMutation, useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Papa from "papaparse";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Upload, FileText, Download, AlertCircle, CheckCircle, XCircle, Globe } from "lucide-react";
+import { Upload, FileText, Download, AlertCircle, CheckCircle, XCircle, Globe, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { ApiIntegrationsTab } from "@/components/contacts/ApiIntegrationsTab";
@@ -91,10 +91,56 @@ export default function IntegrationsPage() {
 
   const connectIntegration = useMutation(api.integrations.createIntegration);
   const updateIntegration = useMutation(api.integrations.updateIntegration);
+  const deleteIntegration = useMutation(api.integrations.deleteIntegration);
   const validateSheets = useAction(api.googleSheetsIntegration.validateSheetsAccess);
   const importFromSheets = useAction(api.googleSheetsIntegration.syncContactsFromSheets);
+  
+  // Query existing Google Sheets integrations
+  const existingIntegrations = useQuery(api.integrations.getUserIntegrations);
+  const googleSheetsIntegrations = existingIntegrations?.filter(
+    integration => integration.type === "google_sheets" && integration.status === "connected"
+  ) || [];
 
   const importContacts = useMutation(api.contacts_enhanced.importContacts);
+
+  // Auto-detect connected Google Sheets integrations
+  useEffect(() => {
+    if (googleSheetsIntegrations.length > 0 && googleStep === "connect") {
+      const latestIntegration = googleSheetsIntegrations[0];
+      if (latestIntegration.configuration?.spreadsheetId && latestIntegration.configuration?.accessToken) {
+        // Set the sheet info from the existing integration
+        setSheetInfo({
+          title: latestIntegration.configuration.title || "Connected Spreadsheet",
+          spreadsheetId: latestIntegration.configuration.spreadsheetId,
+          accessToken: latestIntegration.configuration.accessToken,
+          integrationId: latestIntegration._id,
+          sheets: (latestIntegration.configuration.sheets || []).map(sheet => ({
+            ...sheet,
+            sheetId: String(sheet.sheetId)
+          }))
+        });
+        setGoogleStep("select");
+      }
+    }
+  }, [googleSheetsIntegrations, googleStep]);
+
+  const handleDisconnectIntegration = useCallback(async (integrationId: string) => {
+    try {
+      await deleteIntegration({ integrationId: integrationId as any });
+      // Reset local state
+      setSheetInfo(null);
+      setGoogleStep("connect");
+      setSelectedSheet("");
+      toast("Integration Disconnected", {
+        description: "Google Sheets integration has been removed successfully.",
+      });
+    } catch (error) {
+      console.error("Failed to disconnect integration:", error);
+      toast("Error", {
+        description: "Failed to disconnect the integration. Please try again.",
+      });
+    }
+  }, [deleteIntegration]);
 
   const handleConnectGoogleSheets = useCallback(async () => {
     try {
@@ -229,12 +275,14 @@ export default function IntegrationsPage() {
         // Update integration status to active and store spreadsheet info
         await updateIntegration({
           integrationId: integrationId,
-          status: "active",
+          status: "connected",
           isActive: true,
           configuration: {
             accessToken: tokens.accessToken,
             refreshToken: tokens.refreshToken,
             spreadsheetId: validation.spreadsheetId,
+            title: validation.spreadsheetTitle,
+            sheets: validation.sheets,
           },
         });
 
@@ -273,6 +321,17 @@ export default function IntegrationsPage() {
     try {
       setImportStatus("loading");
 
+      // Get the current integration to get the refresh token
+      const currentIntegration = googleSheetsIntegrations.find(
+        int => int._id === sheetInfo.integrationId
+      );
+
+      console.log('Fetching sheet data with tokens:', {
+        hasAccessToken: !!sheetInfo.accessToken,
+        hasRefreshToken: !!currentIntegration?.configuration?.refreshToken,
+        integrationId: sheetInfo.integrationId
+      });
+
       const response = await fetch('/api/google/sheets/data', {
         method: 'POST',
         headers: {
@@ -282,11 +341,33 @@ export default function IntegrationsPage() {
           spreadsheetId: sheetInfo.spreadsheetId,
           sheetName: sheetName,
           accessToken: sheetInfo.accessToken,
+          refreshToken: currentIntegration?.configuration?.refreshToken,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch sheet data');
+        const errorData = await response.json();
+        if (response.status === 401) {
+          // Token expired and couldn't be refreshed
+          toast("Authentication Error", {
+            description: errorData.error || "Your Google connection has expired. Please reconnect your account.",
+            action: {
+              label: "Reconnect",
+              onClick: () => {
+                // Disconnect and reconnect to get fresh tokens
+                if (currentIntegration) {
+                  handleDisconnectIntegration(currentIntegration._id).then(() => {
+                    setTimeout(() => handleConnectGoogleSheets(), 1000);
+                  });
+                }
+              }
+            }
+          });
+          setGoogleStep("connect");
+          setSheetInfo(null);
+          return;
+        }
+        throw new Error(errorData.error || 'Failed to fetch sheet data');
       }
 
       const data = await response.json();
@@ -296,6 +377,30 @@ export default function IntegrationsPage() {
           description: "No valid data found in the selected sheet",
         });
         return;
+      }
+
+      // If a new access token was returned, update the integration
+      if (data.newAccessToken && currentIntegration) {
+        try {
+          await updateIntegration({
+            integrationId: currentIntegration._id,
+            configuration: {
+              ...currentIntegration.configuration,
+              accessToken: data.newAccessToken,
+            },
+          });
+          
+          // Update local state too
+          setSheetInfo(prev => ({
+            ...prev!,
+            accessToken: data.newAccessToken,
+          }));
+          
+          console.log('Integration updated with new access token');
+        } catch (updateError) {
+          console.error('Failed to update integration with new token:', updateError);
+          // Continue anyway, the operation succeeded
+        }
       }
 
       // Transform the data into CSV-like format for reusing the same preview logic
@@ -924,7 +1029,114 @@ export default function IntegrationsPage() {
         </TabsContent>
 
         <TabsContent value="google" className="space-y-4">
-        {googleStep === "connect" && (
+        {/* Show connected integrations if any exist */}
+        {googleSheetsIntegrations.length > 0 && googleStep === "connect" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+                Google Sheets Connected
+              </CardTitle>
+              <CardDescription>
+                You have {googleSheetsIntegrations.length} connected Google Sheets integration(s)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h4 className="font-medium text-blue-800 mb-2">💡 Having connection issues?</h4>
+                  <p className="text-sm text-blue-700 mb-2">
+                    If you're experiencing authentication errors, try using the "Reconnect" button to get fresh tokens.
+                  </p>
+                  <p className="text-sm text-blue-700">
+                    Google tokens expire regularly and need to be refreshed. Reconnecting ensures you have the latest tokens.
+                  </p>
+                </div>
+                
+                {googleSheetsIntegrations.map((integration) => (
+                  <div key={integration._id} className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-green-800">
+                          {integration.configuration?.title || integration.name}
+                        </h4>
+                        <p className="text-sm text-green-700">
+                          Connected • {integration.configuration?.sheets?.length || 0} sheets available
+                          {!integration.configuration?.refreshToken && (
+                            <span className="text-orange-600 ml-2">⚠️ Limited refresh capability</span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => {
+                            setSheetInfo({
+                              title: integration.configuration?.title || integration.name,
+                              spreadsheetId: integration.configuration?.spreadsheetId,
+                              accessToken: integration.configuration?.accessToken,
+                              integrationId: integration._id,
+                              sheets: (integration.configuration?.sheets || []).map(sheet => ({
+                                ...sheet,
+                                sheetId: String(sheet.sheetId)
+                              }))
+                            });
+                            setGoogleStep("select");
+                          }}
+                          size="sm"
+                        >
+                          Use This Sheet
+                        </Button>
+                        <Button
+                          onClick={() => handleDisconnectIntegration(integration._id)}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Disconnect
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            // Force reconnect to get fresh tokens
+                            handleDisconnectIntegration(integration._id).then(() => {
+                              setTimeout(() => handleConnectGoogleSheets(), 1000);
+                            });
+                          }}
+                          variant="ghost"
+                          size="sm"
+                        >
+                          Reconnect
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                <div className="pt-2">
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => handleConnectGoogleSheets()}
+                      variant="outline"
+                      className="flex-1"
+                      disabled={importStatus === "loading"}
+                    >
+                      <Globe className="mr-2 h-4 w-4" />
+                      Connect Another Google Sheet
+                    </Button>
+                    <Button
+                      onClick={() => window.location.reload()}
+                      variant="ghost"
+                      size="sm"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Show connection form only if no integrations exist */}
+        {googleSheetsIntegrations.length === 0 && googleStep === "connect" && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1104,12 +1316,9 @@ export default function IntegrationsPage() {
                       setParsedContacts([]);
                       setColumnMapping({});
                       setGoogleStep("connect");
-                      toast("Disconnected from Google Sheets", {
-                        description: "You can reconnect anytime to import contacts.",
-                      });
                     }}
                   >
-                    Disconnect
+                    Back to Integrations
                   </Button>
                   {selectedSheet && (
                     <Button variant="outline" onClick={() => handleSheetSelect(selectedSheet)}>

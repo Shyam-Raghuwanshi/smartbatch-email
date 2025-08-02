@@ -17,6 +17,14 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--normal-border": "var(--border)",
         } as React.CSSProperties
       }
+      toastOptions={{
+        style: {
+          background: "var(--popover)",
+          border: "1px solid var(--border)",
+          color: "var(--popover-foreground)",
+        },
+        descriptionClassName: "text-slate-600 dark:text-slate-400 opacity-90",
+      }}
       {...props}
     />
   )
