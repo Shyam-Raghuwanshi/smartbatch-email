@@ -60,6 +60,15 @@ function CampaignMonitoring() {
   // Get alerts for all campaigns
   const alerts = useQuery(api.campaignMonitoring.getAlertTriggers, {});
   
+  // Get comparative data for selected campaigns (for CSV export)
+  const comparativeData = useQuery(
+    api.campaignMonitoring.getComparativeCampaignAnalytics,
+    selectedCampaignIds.length > 0 ? { 
+      campaignIds: selectedCampaignIds, 
+      timeRange: heatmapDays 
+    } : "skip"
+  );
+  
   // Campaign control mutations
   const pauseCampaign = useMutation(api.campaigns.pauseCampaign);
   const resumeCampaign = useMutation(api.campaigns.resumeCampaign);
@@ -114,6 +123,51 @@ function CampaignMonitoring() {
         console.error(error);
       }
     }
+  };
+  
+  const handleExportCSV = () => {
+    if (!comparativeData || comparativeData.length === 0) {
+      toast.error("No campaign data available for export");
+      return;
+    }
+    
+    const csvData = [
+      ['Campaign Name', 'Status', 'Sent', 'Delivered', 'Delivery Rate', 'Open Rate', 'Click Rate', 'Bounce Rate', 'Unsubscribe Rate', 'Created Date']
+    ];
+    
+    comparativeData.forEach(campaign => {
+      const stats = campaign.stats || {};
+      const rates = campaign.rates || {};
+      
+      csvData.push([
+        campaign.campaignName || 'Unknown Campaign',
+        campaign.status || 'Unknown',
+        (stats.sent || 0).toString(),
+        (stats.delivered || 0).toString(),
+        `${(rates.deliveryRate || 0).toFixed(2)}%`,
+        `${(rates.openRate || 0).toFixed(2)}%`,
+        `${(rates.clickRate || 0).toFixed(2)}%`,
+        `${(rates.bounceRate || 0).toFixed(2)}%`,
+        `${(rates.unsubscribeRate || 0).toFixed(2)}%`,
+        campaign.createdAt ? new Date(campaign.createdAt).toLocaleDateString() : 'Unknown Date'
+      ]);
+    });
+    
+    const csvContent = csvData.map(row => 
+      row.map(cell => `"${cell.toString().replace(/"/g, '""')}"`)
+    ).map(row => row.join(',')).join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `campaign-monitoring-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    
+    toast.success(`CSV exported successfully! (${comparativeData.length} campaigns)`);
   };
   
   return (
@@ -180,7 +234,7 @@ function CampaignMonitoring() {
               <div>
                 <CardTitle>Select Campaign to Monitor</CardTitle>
                 <CardDescription>
-                  Choose any campaign for detailed monitoring and analytics
+                  Choose campaigns for detailed monitoring and analytics. Select multiple campaigns to export comparative data.
                 </CardDescription>
               </div>
               <div className="flex items-center gap-3">
@@ -198,12 +252,15 @@ function CampaignMonitoring() {
                   variant="outline"
                   size="sm"
                   disabled={selectedCampaignIds.length === 0}
-                  onClick={() => {
-                    // TODO: Implement CSV export functionality
-                    toast.success("CSV export feature coming soon!");
-                  }}
+                  onClick={handleExportCSV}
+                  className="flex items-center gap-2"
                 >
                   Export CSV
+                  {selectedCampaignIds.length > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {selectedCampaignIds.length}
+                    </Badge>
+                  )}
                 </Button>
               </div>
             </div>
@@ -227,8 +284,17 @@ function CampaignMonitoring() {
                     variant={isSelected ? "default" : "outline"}
                     className={`h-auto p-4 justify-start ${isSelected ? 'bg-blue-500 text-white' : ''}`}
                     onClick={() => {
-                      setSelectedCampaignIds([campaign._id]);
-                      setActiveTab("realtime");
+                      if (isSelected) {
+                        // If already selected, remove from selection
+                        setSelectedCampaignIds(prev => prev.filter(id => id !== campaign._id));
+                      } else {
+                        // If not selected, add to selection
+                        setSelectedCampaignIds(prev => [...prev, campaign._id]);
+                      }
+                      // Only set active tab if this is the first selection
+                      if (selectedCampaignIds.length === 0) {
+                        setActiveTab("realtime");
+                      }
                     }}
                   >
                     <div className="text-left w-full">
