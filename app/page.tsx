@@ -4,6 +4,7 @@ import { SignInButton, SignUpButton, useUser } from '@clerk/nextjs'
 import Link from 'next/link'
 import { useEffect } from 'react'
 import { redirect } from 'next/navigation'
+import { Logo } from '@/components/ui/logo'
 
 export default function Home() {
   const { isSignedIn, user } = useUser()
@@ -22,7 +23,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-blue-600">SmartBatch</h1>
+              <Logo size="lg" href="/" />
             </div>
             <div className="flex space-x-4">
               <SignInButton mode="modal">

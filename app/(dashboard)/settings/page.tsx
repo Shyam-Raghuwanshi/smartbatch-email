@@ -16,7 +16,7 @@ import { useSearchParams } from "next/navigation";
 function SettingsContent() {
   const { isLoaded, isSignedIn } = useAuth();
   const searchParams = useSearchParams();
-  const initialTab = searchParams?.get("tab") || "general";
+  const initialTab = searchParams?.get("tab") || "email";
   const [activeTab, setActiveTab] = useState(initialTab);
   
   // Only run queries if user is authenticated and Clerk is loaded
@@ -37,7 +37,7 @@ function SettingsContent() {
 
   // Update tab when URL param changes
   useEffect(() => {
-    const urlTab = searchParams?.get("tab") || "general";
+    const urlTab = searchParams?.get("tab") || "email";
     console.log('useEffect - URL tab:', urlTab, 'Current activeTab:', activeTab);
     if (urlTab !== activeTab) {
       console.log('Setting activeTab to:', urlTab);
@@ -102,29 +102,10 @@ function SettingsContent() {
         // Update URL to reflect the current tab
         window.history.pushState({}, '', `/settings?tab=${value}`);
       }}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="general">General</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="email">Email Settings</TabsTrigger>
           <TabsTrigger value="integrations">Integration Settings</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="general" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Account Settings
-              </CardTitle>
-              <CardDescription>
-                Configure your account preferences and notification settings.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              
-              <p className="text-sm text-gray-500">General settings panel coming soon...</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="email" className="space-y-6">
          

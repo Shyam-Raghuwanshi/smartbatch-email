@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
+import { Logo } from '@/components/ui/logo';
 import { cn } from '@/lib/utils';
 
 export interface NavItem {
@@ -70,12 +71,7 @@ function DesktopSidebar({ className }: { className?: string }) {
       <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4">
         {/* Logo */}
         <div className="flex h-16 shrink-0 items-center">
-          <Link href="/dashboard" className="flex items-center space-x-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-blue-600 to-blue-700">
-              <span className="text-sm font-bold text-white">S</span>
-            </div>
-            <span className="text-xl font-bold text-gray-900">SmartBatch</span>
-          </Link>
+          <Logo size="md" />
         </div>
 
         {/* Navigation */}
@@ -169,12 +165,7 @@ function MobileSidebar() {
         <div className="flex h-full flex-col">
           {/* Logo */}
           <div className="flex h-16 shrink-0 items-center px-4">
-            <Link href="/dashboard" className="flex items-center space-x-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-blue-600 to-blue-700">
-                <span className="text-sm font-bold text-white">S</span>
-              </div>
-              <span className="text-xl font-bold text-gray-900">SmartBatch</span>
-            </Link>
+            <Logo size="md" />
           </div>
 
           {/* Navigation */}
