@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 // Create contact
 export const createContact = mutation({
@@ -359,6 +360,21 @@ export const bulkImportContacts = mutation({
       });
       contactIds.push(contactId);
     }
+    
+    // Create notification for contact import
+    if (contactIds.length > 0) {
+      await ctx.runMutation(internal.notifications.createNotification, {
+        userId: user._id,
+        title: "Contacts Imported",
+        message: `${contactIds.length} new contacts were imported successfully`,
+        type: "success",
+        category: "contact",
+        data: {
+          contactCount: contactIds.length,
+        },
+      });
+    }
+    
     return contactIds;
   },
 });

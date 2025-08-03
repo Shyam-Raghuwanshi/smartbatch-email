@@ -51,6 +51,8 @@ import type * as lib from "../lib.js";
 import type * as migrations_add_updated_at_to_contacts from "../migrations/add_updated_at_to_contacts.js";
 import type * as migrations from "../migrations.js";
 import type * as monitoring from "../monitoring.js";
+import type * as notificationSeeder from "../notificationSeeder.js";
+import type * as notifications from "../notifications.js";
 import type * as oauth from "../oauth.js";
 import type * as oauthActions from "../oauthActions.js";
 import type * as optimizedQueries from "../optimizedQueries.js";
@@ -135,6 +137,8 @@ declare const fullApi: ApiFromModules<{
   "migrations/add_updated_at_to_contacts": typeof migrations_add_updated_at_to_contacts;
   migrations: typeof migrations;
   monitoring: typeof monitoring;
+  notificationSeeder: typeof notificationSeeder;
+  notifications: typeof notifications;
   oauth: typeof oauth;
   oauthActions: typeof oauthActions;
   optimizedQueries: typeof optimizedQueries;

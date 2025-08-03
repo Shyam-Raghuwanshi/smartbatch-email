@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalQuery } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 // Create user
 export const createUser = mutation({
@@ -90,6 +91,37 @@ export const getCurrentUser = query({
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .unique();
+  },
+});
+
+// Initialize user with sample notifications if they don't have any
+export const initializeUserNotifications = mutation({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    
+    if (!user) {
+      throw new Error("User not found");
+    }
+    
+    // Check if user already has notifications
+    const existingNotifications = await ctx.db
+      .query("notifications")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+    
+    if (!existingNotifications) {
+      await ctx.runMutation(internal.notificationSeeder.createSampleNotifications, {
+        userId: user._id,
+      });
+    }
   },
 });
 

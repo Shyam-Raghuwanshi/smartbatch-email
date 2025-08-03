@@ -1405,6 +1405,41 @@ export default defineSchema({
   })
     .index("by_user", ["userId"]),
 
+  // User notifications for campaigns, alerts, and system events
+  notifications: defineTable({
+    userId: v.id("users"),
+    title: v.string(),
+    message: v.string(),
+    type: v.union(
+      v.literal("success"),
+      v.literal("info"),
+      v.literal("warning"),
+      v.literal("error")
+    ),
+    category: v.union(
+      v.literal("campaign"),
+      v.literal("contact"),
+      v.literal("system"),
+      v.literal("alert"),
+      v.literal("integration")
+    ),
+    read: v.boolean(),
+    data: v.optional(v.object({
+      campaignId: v.optional(v.id("campaigns")),
+      contactCount: v.optional(v.number()),
+      alertLevel: v.optional(v.string()),
+      integrationId: v.optional(v.id("integrations")),
+      url: v.optional(v.string()),
+    })),
+    createdAt: v.number(),
+    readAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_read", ["userId", "read"])
+    .index("by_user_created_at", ["userId", "createdAt"])
+    .index("by_category", ["category"])
+    .index("by_type", ["type"]),
+
   // API request logs for rate limiting
   apiRequestLogs: defineTable({
     apiKeyId: v.id("apiKeys"),

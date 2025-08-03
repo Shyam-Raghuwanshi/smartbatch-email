@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 
 /**
@@ -331,6 +331,29 @@ export const updateCampaign = mutation({
       await ctx.runMutation(internal.campaigns.queueCampaignEmails, {
         campaignId: id,
         userId: user._id,
+      });
+    }
+    
+    // If status is changing to "sent", create a completion notification
+    if (updates.status === "sent" && campaign.status !== "sent") {
+      // Get campaign email stats for the notification
+      const emailQueue = await ctx.db
+        .query("emailQueue")
+        .withIndex("by_campaign", (q) => q.eq("campaignId", id))
+        .collect();
+      
+      const sentCount = emailQueue.filter(e => e.status === "sent").length;
+      
+      await ctx.runMutation(internal.notifications.createNotification, {
+        userId: user._id,
+        title: "Campaign Completed",
+        message: `Your "${campaign.name}" campaign has finished sending to ${sentCount} contacts`,
+        type: "success",
+        category: "campaign",
+        data: {
+          campaignId: id,
+          contactCount: sentCount,
+        },
       });
     }
     

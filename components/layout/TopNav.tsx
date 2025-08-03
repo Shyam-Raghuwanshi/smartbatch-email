@@ -1,7 +1,8 @@
 "use client";
 
+import React from 'react';
 import { UserButton } from '@clerk/nextjs';
-import { Bell, Search } from 'lucide-react';
+import { Bell, Search, X, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -12,48 +13,76 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 
 interface TopNavProps {
   title?: string;
 }
 
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  time: string;
-  read: boolean;
-  type: 'info' | 'success' | 'warning' | 'error';
-}
-
-const mockNotifications: Notification[] = [
-  {
-    id: '1',
-    title: 'Campaign Completed',
-    message: 'Your "Summer Sale" campaign has finished sending to 1,234 contacts',
-    time: '2 minutes ago',
-    read: false,
-    type: 'success',
-  },
-  {
-    id: '3',
-    title: 'New Contact Added',
-    message: '25 new contacts were imported from your CSV file',
-    time: '3 hours ago',
-    read: true,
-    type: 'info',
-  },
-];
-
 export default function TopNav({ title = "Dashboard" }: TopNavProps) {
-  const unreadCount = mockNotifications.filter(n => !n.read).length;
+  // Get real notifications from Convex
+  const notifications = useQuery(api.notifications.getUserNotifications, { limit: 20 });
+  const unreadCount = useQuery(api.notifications.getUnreadCount);
+  const markAsRead = useMutation(api.notifications.markAsRead);
+  const markAllAsRead = useMutation(api.notifications.markAllAsRead);
+  const deleteNotification = useMutation(api.notifications.deleteNotification);
+  const deleteAllNotifications = useMutation(api.notifications.deleteAllNotifications);
+  const initializeNotifications = useMutation(api.users.initializeUserNotifications);
 
-  const getNotificationIcon = (type: Notification['type']) => {
+  // Initialize sample notifications for new users
+  React.useEffect(() => {
+    const init = async () => {
+      try {
+        await initializeNotifications();
+      } catch (error) {
+        // Ignore errors - user might not be authenticated yet
+      }
+    };
+    init();
+  }, [initializeNotifications]);
+
+  const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'success': return 'bg-green-400';
       case 'warning': return 'bg-yellow-400';
       case 'error': return 'bg-red-400';
       default: return 'bg-blue-400';
+    }
+  };
+
+  const handleNotificationClick = async (notificationId: string, isRead: boolean) => {
+    if (!isRead) {
+      try {
+        await markAsRead({ notificationId: notificationId as any });
+      } catch (error) {
+        console.error('Failed to mark notification as read:', error);
+      }
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await markAllAsRead();
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
+    }
+  };
+
+  const handleDeleteNotification = async (notificationId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      await deleteNotification({ notificationId: notificationId as any });
+    } catch (error) {
+      console.error('Failed to delete notification:', error);
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      await deleteAllNotifications();
+    } catch (error) {
+      console.error('Failed to clear all notifications:', error);
     }
   };
 
@@ -66,18 +95,13 @@ export default function TopNav({ title = "Dashboard" }: TopNavProps) {
 
       {/* Right side actions */}
       <div className="flex items-center gap-x-4 lg:gap-x-6">
-        {/* Search */}
-        <Button variant="outline" size="icon" className="hidden sm:flex">
-          <Search className="h-4 w-4" />
-          <span className="sr-only">Search</span>
-        </Button>
 
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="icon" className="relative">
               <Bell className="h-4 w-4" />
-              {unreadCount > 0 && (
+              {(unreadCount || 0) > 0 && (
                 <Badge 
                   variant="destructive" 
                   className="absolute -right-1 -top-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
@@ -89,22 +113,74 @@ export default function TopNav({ title = "Dashboard" }: TopNavProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+            <DropdownMenuLabel className="flex items-center justify-between">
+              Notifications
+              <div className="flex gap-1">
+                {(unreadCount || 0) > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleMarkAllAsRead}
+                    className="text-xs h-auto p-1"
+                  >
+                    Mark all read
+                  </Button>
+                )}
+                {notifications && notifications.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearAll}
+                    className="text-xs h-auto p-1 text-red-600 hover:text-red-700"
+                  >
+                    Clear all
+                  </Button>
+                )}
+              </div>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {mockNotifications.map((notification) => (
-              <DropdownMenuItem key={notification.id} className="flex items-start space-x-3 p-3">
-                <div className={`w-2 h-2 rounded-full mt-2 ${getNotificationIcon(notification.type)}`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900">{notification.title}</p>
-                  <p className="text-sm text-gray-500 line-clamp-2">{notification.message}</p>
-                  <p className="text-xs text-gray-400 mt-1">{notification.time}</p>
+            <div className="max-h-96 overflow-y-auto">
+              {notifications && notifications.length > 0 ? (
+                notifications.map((notification:any) => (
+                  <DropdownMenuItem 
+                    key={notification._id} 
+                    className={`flex items-start space-x-3 p-3 cursor-pointer group relative ${
+                      !notification.read ? 'bg-blue-50 dark:bg-blue-950/20' : ''
+                    }`}
+                    onClick={() => handleNotificationClick(notification._id, notification.read)}
+                  >
+                    <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${getNotificationIcon(notification.type)}`} />
+                    <div className="flex-1 min-w-0 pr-8">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {notification.title}
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+                        {notification.message}
+                      </p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        {notification.time}
+                      </p>
+                    </div>
+                    {!notification.read && (
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => handleDeleteNotification(notification._id, e)}
+                      className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 p-0 text-gray-400 hover:text-red-500"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuItem>
+                ))
+              ) : (
+                <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+                  <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No notifications yet</p>
                 </div>
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-center text-sm text-blue-600">
-              View all notifications
-            </DropdownMenuItem>
+              )}
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
 
