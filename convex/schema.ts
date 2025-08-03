@@ -220,7 +220,7 @@ export default defineSchema({
     .index("by_clicked_at", ["clickedAt"]),
 
   templates: defineTable({
-    userId: v.id("users"),
+    userId: v.optional(v.id("users")), // Optional for global/system templates
     name: v.string(),
     subject: v.string(),
     content: v.string(),
