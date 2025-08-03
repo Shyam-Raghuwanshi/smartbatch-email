@@ -12,13 +12,31 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { 
   Clock, 
   RefreshCw, 
   Globe, 
   CheckCircle, 
   XCircle, 
   AlertTriangle,
-  Calendar
+  Calendar,
+  Trash2,
+  MoreHorizontal
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,8 +47,11 @@ interface IntegrationPollingSettingsProps {
 export function IntegrationPollingSettings({ integration }: IntegrationPollingSettingsProps) {
   const { isLoaded, isSignedIn } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const updatePollingSettings = useMutation(api.integrationPolling.updatePollingSettings);
+  const deleteIntegration = useMutation(api.integrations.deleteIntegration);
   const pollingSettings = useQuery(
     api.integrationPolling.getPollingSettings, 
     isLoaded && isSignedIn ? { integrationId: integration._id } : "skip"
@@ -77,6 +98,20 @@ export function IntegrationPollingSettings({ integration }: IntegrationPollingSe
       toast.error(`Failed to ${enabled ? 'enable' : 'disable'} polling`);
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleDeleteIntegration = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteIntegration({ integrationId: integration._id });
+      toast.success(`Integration "${integration.name}" deleted successfully`);
+      setShowDeleteDialog(false);
+    } catch (error) {
+      console.error("Delete failed:", error);
+      toast.error("Failed to delete integration");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -131,11 +166,18 @@ export function IntegrationPollingSettings({ integration }: IntegrationPollingSe
     return (
       <Card className="opacity-50">
         <CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            {getIntegrationIcon(integration.type)}
-            <div>
-              <div className="font-medium">{integration.name}</div>
-              <div className="text-sm text-gray-500">Loading polling settings...</div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {getIntegrationIcon(integration.type)}
+              <div>
+                <div className="font-medium">{integration.name}</div>
+                <div className="text-sm text-gray-500">Loading polling settings...</div>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </CardContent>
@@ -144,39 +186,59 @@ export function IntegrationPollingSettings({ integration }: IntegrationPollingSe
   }
 
   return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="space-y-4">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {getIntegrationIcon(integration.type)}
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{integration.name}</span>
-                  {getStatusIcon(integration.status)}
-                  <Badge variant={integration.status === "active" ? "default" : "secondary"}>
-                    {integration.status}
-                  </Badge>
-                </div>
-                <div className="text-sm text-gray-500 capitalize">
-                  {integration.type.replace("_", " ")} Integration
+    <>
+      <Card>
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {getIntegrationIcon(integration.type)}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{integration.name}</span>
+                    {getStatusIcon(integration.status)}
+                    <Badge variant={integration.status === "active" ? "default" : "secondary"}>
+                      {integration.status}
+                    </Badge>
+                  </div>
+                  <div className="text-sm text-gray-500 capitalize">
+                    {integration.type.replace("_", " ")} Integration
+                  </div>
                 </div>
               </div>
+              
+              <div className="flex items-center space-x-2">
+                <Label htmlFor={`enabled-${integration._id}`} className="text-sm">
+                  Auto-sync
+                </Label>
+                <Switch
+                  id={`enabled-${integration._id}`}
+                  checked={pollingSettings.enabled}
+                  onCheckedChange={handleToggleEnabled}
+                  disabled={isUpdating}
+                />
+                
+                {/* Actions Menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => setShowDeleteDialog(true)}
+                      disabled={isDeleting}
+                      className="text-red-600 focus:text-red-600"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Integration
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
-            
-            <div className="flex items-center space-x-2">
-              <Label htmlFor={`enabled-${integration._id}`} className="text-sm">
-                Auto-sync
-              </Label>
-              <Switch
-                id={`enabled-${integration._id}`}
-                checked={pollingSettings.enabled}
-                onCheckedChange={handleToggleEnabled}
-                disabled={isUpdating}
-              />
-            </div>
-          </div>
 
           {/* Polling Configuration */}
           {pollingSettings.enabled && (
@@ -272,5 +334,40 @@ export function IntegrationPollingSettings({ integration }: IntegrationPollingSe
         </div>
       </CardContent>
     </Card>
+    
+    {/* Delete Confirmation Dialog */}
+    <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Integration</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete the "{integration.name}" integration? 
+            This action cannot be undone and will remove all associated data including sync history, 
+            polling settings, and webhook configurations.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDeleteIntegration}
+            disabled={isDeleting}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            {isDeleting ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Deleting...
+              </>
+            ) : (
+              <>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Integration
+              </>
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

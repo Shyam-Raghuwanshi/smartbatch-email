@@ -196,7 +196,7 @@ export const getIntegrationsForPolling = internalQuery({
     const integrationsWithSettings = await Promise.all(
       dueSettings.map(async (setting) => {
         const integration = await ctx.db.get(setting.integrationId);
-        if (!integration || integration.status !== "connected") {
+        if (!integration || (integration.status !== "connected" && integration.status !== "active")) {
           return null;
         }
 

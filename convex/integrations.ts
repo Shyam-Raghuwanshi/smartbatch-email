@@ -306,6 +306,16 @@ export const deleteIntegration = mutation({
       await ctx.db.delete(sync._id);
     }
 
+    // Delete related polling settings
+    const pollingSettings = await ctx.db
+      .query("integrationPollingSettings")
+      .withIndex("by_integration", (q) => q.eq("integrationId", args.integrationId))
+      .collect();
+
+    for (const setting of pollingSettings) {
+      await ctx.db.delete(setting._id);
+    }
+
     // Delete related webhook endpoints
     const webhooks = await ctx.db
       .query("webhookEndpoints")

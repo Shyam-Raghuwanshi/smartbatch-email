@@ -31,7 +31,8 @@ function SettingsContent() {
   
   // Filter to show only integrations that support polling
   const pollableIntegrations = integrations?.filter((i:any) => 
-    i.type === "google_sheets" && i.status === "connected"
+    (i.type === "google_sheets" || i.type === "api_endpoint") && 
+    (i.status === "connected" || i.status === "active")
   ) || [];
 
   // Update tab when URL param changes
@@ -156,7 +157,7 @@ function SettingsContent() {
                   <Globe className="mx-auto h-12 w-12 text-gray-400" />
                   <h3 className="mt-2 text-sm font-medium text-gray-900">No connected integrations found</h3>
                   <p className="mt-1 text-sm text-gray-500">
-                    Connect Google Sheets integrations to enable automatic syncing.
+                    Connect Google Sheets or API integrations to enable automatic syncing.
                   </p>
                   <div className="mt-6">
                     <Button variant="outline">

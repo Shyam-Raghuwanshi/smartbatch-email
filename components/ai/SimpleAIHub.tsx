@@ -81,7 +81,7 @@ export function SimpleAIHub() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <Brain className="h-8 w-8 text-primary" />
-            Simple AI Assistant
+            AI Assistant
           </h1>
           <p className="text-muted-foreground">
             Easy email analysis and optimization with AI
@@ -91,45 +91,6 @@ export function SimpleAIHub() {
           <Sparkles className="h-3 w-3 mr-1" />
           Powered by AI
         </Badge>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <Mail className="h-8 w-8 text-blue-500" />
-              <div>
-                <p className="text-2xl font-bold">{templates?.length || 0}</p>
-                <p className="text-sm text-muted-foreground">Templates</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <CheckCircle className="h-8 w-8 text-green-500" />
-              <div>
-                <p className="text-2xl font-bold">{contacts?.length || 0}</p>
-                <p className="text-sm text-muted-foreground">Contacts</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <Sparkles className="h-8 w-8 text-purple-500" />
-              <div>
-                <p className="text-2xl font-bold">Ready</p>
-                <p className="text-sm text-muted-foreground">AI Status</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Main AI Email Analyzer */}
