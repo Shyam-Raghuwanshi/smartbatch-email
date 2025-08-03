@@ -132,3 +132,136 @@
   color: rgb(148 163 184) !important; /* slate-400 for dark mode */
   opacity: 0.9;
 }
+
+/* Email Content Preview Styles */
+.email-content-preview {
+  /* Reset all inherited styles */
+  all: unset;
+  display: block;
+  
+  /* Basic typography reset */
+  font-size: inherit;
+  font-family: inherit;
+  line-height: inherit;
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  text-transform: none;
+  letter-spacing: normal;
+  word-spacing: normal;
+}
+
+.email-content-preview * {
+  box-sizing: border-box;
+}
+
+/* Ensure proper spacing for common elements */
+.email-content-preview h1,
+.email-content-preview h2,
+.email-content-preview h3,
+.email-content-preview h4,
+.email-content-preview h5,
+.email-content-preview h6 {
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.2;
+}
+
+.email-content-preview p {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+.email-content-preview ul,
+.email-content-preview ol {
+  margin-top: 0;
+  margin-bottom: 1em;
+  padding-left: 1.5em;
+}
+
+.email-content-preview li {
+  margin-bottom: 0.25em;
+}
+
+.email-content-preview a {
+  text-decoration: underline;
+}
+
+.email-content-preview img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* TipTap Editor Styles */
+.ProseMirror {
+  outline: none;
+  padding: 1rem;
+  min-height: 300px;
+  height: 100%;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.6;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.ProseMirror p {
+  margin: 0.5em 0;
+}
+
+.ProseMirror p:first-child {
+  margin-top: 0;
+}
+
+.ProseMirror p:last-child {
+  margin-bottom: 0;
+}
+
+.ProseMirror h1,
+.ProseMirror h2,
+.ProseMirror h3 {
+  margin: 1em 0 0.5em 0;
+  font-weight: bold;
+}
+
+.ProseMirror h1 {
+  font-size: 1.5em;
+}
+
+.ProseMirror h2 {
+  font-size: 1.3em;
+}
+
+.ProseMirror h3 {
+  font-size: 1.1em;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.ProseMirror blockquote {
+  border-left: 3px solid #e5e7eb;
+  padding-left: 1em;
+  margin: 1em 0;
+  font-style: italic;
+}
+
+.ProseMirror code {
+  background-color: #f3f4f6;
+  padding: 0.2em 0.4em;
+  border-radius: 0.25em;
+  font-family: monospace;
+}
+
+.ProseMirror a {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5em;
+}

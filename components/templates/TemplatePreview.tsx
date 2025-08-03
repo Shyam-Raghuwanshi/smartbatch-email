@@ -25,6 +25,14 @@ interface Template {
   variables: string[];
   updatedAt: number;
   usageCount?: number;
+  settings?: {
+    textColor?: string;
+    backgroundColor?: string;
+    fontFamily?: string;
+    fontSize?: string;
+    linkColor?: string;
+    buttonColor?: string;
+  };
 }
 
 interface TemplatePreviewProps {
@@ -56,7 +64,7 @@ export function TemplatePreview({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>{template.name}</span>
@@ -135,7 +143,7 @@ export function TemplatePreview({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-hidden" style={{ isolation: 'isolate' }}>
                 {/* Email Header */}
                 <div className="bg-gray-100 p-4 border-b">
                   <div className="text-sm text-gray-600">From: your-email@example.com</div>
@@ -144,15 +152,22 @@ export function TemplatePreview({
                 </div>
                 
                 {/* Email Content */}
-                <div className="p-6 bg-white">
+                <div 
+                  className="p-6"
+                  style={{
+                    backgroundColor: template.settings?.backgroundColor || '#ffffff',
+                    isolation: 'isolate',
+                  }}
+                >
                   <div 
                     dangerouslySetInnerHTML={{ __html: template.content }}
-                    className="prose prose-sm max-w-none"
                     style={{
-                      fontFamily: 'Arial, sans-serif',
+                      fontFamily: template.settings?.fontFamily || 'Arial, sans-serif',
+                      fontSize: template.settings?.fontSize || '16px',
                       lineHeight: '1.6',
-                      color: '#333333'
-                    }}
+                      color: template.settings?.textColor || '#333333',
+                    } as React.CSSProperties}
+                    className="email-content-preview"
                   />
                 </div>
               </div>

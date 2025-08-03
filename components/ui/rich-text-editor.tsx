@@ -88,7 +88,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none min-h-[200px] p-4',
+        class: 'prose prose-sm max-w-none focus:outline-none p-4 h-full overflow-y-auto',
+        style: 'min-height: 300px;',
       },
     },
   });
@@ -136,9 +137,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   }
 
   return (
-    <div className={`border border-gray-200 rounded-lg overflow-hidden ${className}`}>
+    <div className={`border border-gray-200 rounded-lg flex flex-col ${className}`}>
       {/* Toolbar */}
-      <div className="border-b border-gray-200 p-2 flex flex-wrap items-center gap-1 bg-gray-50">
+      <div className="border-b border-gray-200 p-2 flex flex-wrap items-center gap-1 bg-gray-50 relative z-10 flex-shrink-0">
         {/* Text Formatting */}
         <div className="flex items-center gap-1">
           <Toggle
@@ -275,7 +276,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               <Palette className="h-4 w-4" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-80">
+          <PopoverContent className="w-80 z-50">
             <div className="space-y-2">
               <Label htmlFor="color">Text Color</Label>
               <div className="flex items-center gap-2">
@@ -301,7 +302,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               <LinkIcon className="h-4 w-4" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-80">
+          <PopoverContent className="w-80 z-50">
             <div className="space-y-2">
               <Label htmlFor="link">Link URL</Label>
               <div className="flex items-center gap-2">
@@ -331,7 +332,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               <ImageIcon className="h-4 w-4" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-80">
+          <PopoverContent className="w-80 z-50">
             <div className="space-y-2">
               <Label htmlFor="image">Image URL</Label>
               <div className="flex items-center gap-2">
@@ -360,7 +361,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                 Variables
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-60">
+            <PopoverContent className="w-60 z-50">
               <div className="space-y-2">
                 <Label>Insert Variable</Label>
                 <div className="grid grid-cols-1 gap-1">
@@ -405,8 +406,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       </div>
 
       {/* Editor Content */}
-      <div className="min-h-[200px] max-h-[500px] overflow-y-auto">
-        <EditorContent editor={editor} />
+      <div className="flex-1 overflow-hidden bg-white">
+        <EditorContent 
+          editor={editor} 
+          className="h-full w-full"
+        />
       </div>
     </div>
   );
