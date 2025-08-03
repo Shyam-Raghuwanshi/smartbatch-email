@@ -53,8 +53,8 @@ function SettingsContent() {
   // Show loading state while Clerk is loading
   if (!isLoaded) {
     return (
-      <div className="space-y-6">
-        <div>
+      <div className="h-full flex flex-col overflow-hidden">
+        <div className="flex-shrink-0 px-6 py-4 border-b bg-white">
           <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
             Settings
           </h2>
@@ -62,7 +62,7 @@ function SettingsContent() {
             Loading...
           </p>
         </div>
-        <div className="flex items-center justify-center py-12">
+        <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
         </div>
       </div>
@@ -72,8 +72,8 @@ function SettingsContent() {
   // Redirect to sign-in if not authenticated
   if (!isSignedIn) {
     return (
-      <div className="space-y-6">
-        <div>
+      <div className="h-full flex flex-col overflow-hidden">
+        <div className="flex-shrink-0 px-6 py-4 border-b bg-white">
           <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
             Settings
           </h2>
@@ -86,8 +86,8 @@ function SettingsContent() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-shrink-0 px-6 py-4 border-b bg-white">
         <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
           Settings
         </h2>
@@ -96,61 +96,74 @@ function SettingsContent() {
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(value) => {
-        console.log('Tab changed to:', value);
-        setActiveTab(value);
-        // Update URL to reflect the current tab
-        window.history.pushState({}, '', `/settings?tab=${value}`);
-      }}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="email">Email Settings</TabsTrigger>
-          <TabsTrigger value="integrations">Integration Settings</TabsTrigger>
-        </TabsList>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Tabs 
+          value={activeTab} 
+          onValueChange={(value) => {
+            console.log('Tab changed to:', value);
+            setActiveTab(value);
+            // Update URL to reflect the current tab
+            window.history.pushState({}, '', `/settings?tab=${value}`);
+          }}
+          className="flex-1 flex flex-col overflow-hidden"
+        >
+          <div className="flex-shrink-0 px-6 py-3 border-b bg-gray-50">
+            <TabsList className="grid w-full grid-cols-2 max-w-md">
+              <TabsTrigger value="email">Email Settings</TabsTrigger>
+              <TabsTrigger value="integrations">Integration Settings</TabsTrigger>
+            </TabsList>
+          </div>
 
-        <TabsContent value="email" className="space-y-6">
-         
-          <EmailSettingsManager />
-        </TabsContent>
+          <div className="flex-1 overflow-auto">
+            <TabsContent value="email" className="h-full p-6 m-0">
+              <div className="max-w-4xl mx-auto">
+                <EmailSettingsManager />
+              </div>
+            </TabsContent>
 
-        <TabsContent value="integrations" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <RefreshCw className="h-5 w-5" />
-                Integration Polling Settings
-              </CardTitle>
-              <CardDescription>
-                Configure how often your integrations sync data automatically.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {pollableIntegrations && pollableIntegrations.length > 0 ? (
-                <div className="space-y-4">
-                  {pollableIntegrations.map((integration:any) => (
-                    <IntegrationPollingSettings
-                      key={integration._id}
-                      integration={integration}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Globe className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">No connected integrations found</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Connect Google Sheets or API integrations to enable automatic syncing.
-                  </p>
-                  <div className="mt-6">
-                    <Button variant="outline">
-                      Go to Integrations
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            <TabsContent value="integrations" className="h-full p-6 m-0">
+              <div className="max-w-4xl mx-auto">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <RefreshCw className="h-5 w-5" />
+                      Integration Polling Settings
+                    </CardTitle>
+                    <CardDescription>
+                      Configure how often your integrations sync data automatically.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {pollableIntegrations && pollableIntegrations.length > 0 ? (
+                      <div className="space-y-4">
+                        {pollableIntegrations.map((integration:any) => (
+                          <IntegrationPollingSettings
+                            key={integration._id}
+                            integration={integration}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <Globe className="mx-auto h-12 w-12 text-gray-400" />
+                        <h3 className="mt-2 text-sm font-medium text-gray-900">No connected integrations found</h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                          Connect Google Sheets or API integrations to enable automatic syncing.
+                        </p>
+                        <div className="mt-6">
+                          <Button variant="outline">
+                            Go to Integrations
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          </div>
+        </Tabs>
+      </div>
     </div>
   );
 }
@@ -158,14 +171,17 @@ function SettingsContent() {
 export default function SettingsPage() {
   return (
     <Suspense fallback={
-      <div className="space-y-6">
-        <div>
+      <div className="h-full flex flex-col overflow-hidden">
+        <div className="flex-shrink-0 px-6 py-4 border-b bg-white">
           <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
             Settings
           </h2>
           <p className="mt-2 text-sm text-gray-700">
             Loading settings...
           </p>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
         </div>
       </div>
     }>

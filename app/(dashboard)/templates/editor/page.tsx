@@ -176,7 +176,11 @@ function TemplateEditor() {
       return;
     }
 
+    // Switch to validation tab and clear previous results
+    setActiveTab('validation');
+    setValidationResults(null);
     setIsValidating(true);
+    
     try {
       const results = await validateEmailContent({
         subject: formData.subject,
@@ -185,7 +189,6 @@ function TemplateEditor() {
         targetAudience: 'General', // Could be made configurable
       });
       setValidationResults(results);
-      setActiveTab('validation');
       
       if (results.isAIPowered) {
         toast.success('AI-powered validation completed!');
@@ -206,7 +209,11 @@ function TemplateEditor() {
       return;
     }
 
+    // Switch to optimization tab and clear previous results
+    setActiveTab('optimization');
+    setOptimizationResults(null);
     setIsOptimizing(true);
+    
     try {
       const results = await optimizeTemplateWithAI({
         subject: formData.subject,
@@ -216,7 +223,6 @@ function TemplateEditor() {
         optimizationType: 'comprehensive',
       });
       setOptimizationResults(results);
-      setActiveTab('optimization');
       
       if (results.success) {
         toast.success('AI optimization completed!');
@@ -237,7 +243,11 @@ function TemplateEditor() {
       return;
     }
 
+    // Switch to subjects tab and clear previous results
+    setActiveTab('subjects');
+    setSubjectAlternatives(null);
     setIsGeneratingSubjects(true);
+    
     try {
       const results = await generateSubjectLineAlternatives({
         currentSubject: formData.subject,
@@ -246,7 +256,6 @@ function TemplateEditor() {
         targetAudience: 'General',
       });
       setSubjectAlternatives(results);
-      setActiveTab('subjects');
       
       if (results.success) {
         toast.success('Subject line alternatives generated!');
@@ -806,8 +815,16 @@ function TemplateEditor() {
                 </TabsContent>
 
                 <TabsContent value="validation" className="flex-1 overflow-hidden">
-                  <ScrollArea className="h-full p-4">
-                  {validationResults ? (
+                  <div className="h-full overflow-y-auto p-4">
+                  {isValidating ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">Validating Email Content</h3>
+                        <p className="text-gray-600">AI is analyzing your email for deliverability and compliance...</p>
+                      </div>
+                    </div>
+                  ) : validationResults ? (
                     <div className="space-y-4">
                       <Card>
                         <CardHeader>
@@ -900,12 +917,20 @@ function TemplateEditor() {
                       </div>
                     </div>
                   )}
-                  </ScrollArea>
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="optimization" className="flex-1 overflow-hidden">
-                  <ScrollArea className="h-full p-4">
-                  {optimizationResults && optimizationResults.success ? (
+                  <div className="h-full overflow-y-auto p-4">
+                  {isOptimizing ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">Optimizing Email Content</h3>
+                        <p className="text-gray-600">AI is analyzing and optimizing your email for better performance...</p>
+                      </div>
+                    </div>
+                  ) : optimizationResults && optimizationResults.success ? (
                     <div className="space-y-4">
                       <Card>
                         <CardHeader>
@@ -1010,12 +1035,20 @@ function TemplateEditor() {
                       </div>
                     </div>
                   )}
-                  </ScrollArea>
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="subjects" className="flex-1 overflow-hidden">
-                  <ScrollArea className="h-full p-4">
-                    {subjectAlternatives && subjectAlternatives.success ? (
+                  <div className="h-full overflow-y-auto p-4">
+                    {isGeneratingSubjects ? (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">Generating Subject Lines</h3>
+                          <p className="text-gray-600">AI is creating optimized subject line alternatives...</p>
+                        </div>
+                      </div>
+                    ) : subjectAlternatives && subjectAlternatives.success ? (
                       <div className="space-y-4">
                         <Card>
                           <CardHeader>
@@ -1123,7 +1156,7 @@ function TemplateEditor() {
                       </div>
                     </div>
                   )}
-                  </ScrollArea>
+                  </div>
                 </TabsContent>
               </Tabs>
             </div>
