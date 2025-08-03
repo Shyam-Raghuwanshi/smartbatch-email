@@ -61,11 +61,7 @@ import { CampaignStats } from '@/components/campaigns/CampaignStats';
 import { CampaignDetailModal } from '@/components/campaigns/CampaignDetailModal';
 import { LoadingCard, TableLoadingSkeleton } from '@/components/ui/loading';
 import { toast } from 'sonner';
-import { AutomatedCampaigns } from '@/components/campaigns/AutomatedCampaigns';
-import VisualWorkflowBuilder from '@/components/campaigns/VisualWorkflowBuilder';
-import { BehavioralTriggers } from '@/components/campaigns/BehavioralTriggers';
-import AdvancedScheduling from '@/components/campaigns/AdvancedScheduling';
-import CampaignTemplates from '@/components/campaigns/CampaignTemplates';
+import Link from 'next/link';
 
 type CampaignStatus = 'draft' | 'scheduled' | 'sending' | 'sent' | 'paused' | 'cancelled';
 
@@ -123,10 +119,10 @@ export default function CampaignsPage() {
   const mergedCampaigns = useMemo(() => {
     if (!campaigns) return [];
     if (!campaignUpdates) return campaigns;
-    
+
     // Create a map of campaign IDs to their latest status
     const updateMap = new Map(campaignUpdates.map(c => [c._id, c]));
-    
+
     // Merge campaigns with their latest status
     return campaigns.map(campaign => {
       const update = updateMap.get(campaign._id);
@@ -215,7 +211,7 @@ export default function CampaignsPage() {
 
   // Filter campaigns based on search and status
   const filteredCampaigns = useMemo(() => {
-    return mergedCampaigns.filter((campaign:any) => {
+    return mergedCampaigns.filter((campaign: any) => {
       const matchesSearch = campaign.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         campaign.settings.subject.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === 'all' || campaign.status === statusFilter;
@@ -225,7 +221,7 @@ export default function CampaignsPage() {
 
   // Calculate quick stats
   const stats = useMemo(() => {
-    return mergedCampaigns.reduce((acc:any, campaign:any) => {
+    return mergedCampaigns.reduce((acc: any, campaign: any) => {
       acc.total++;
       if (campaign.status === 'sent') acc.sent++;
       if (campaign.status === 'sending') acc.sending++;
@@ -249,7 +245,7 @@ export default function CampaignsPage() {
 
   const confirmDeleteCampaign = async () => {
     if (!campaignToDelete) return;
-    
+
     try {
       await deleteCampaign({ id: campaignToDelete });
       toast.success('Campaign deleted successfully');
@@ -555,15 +551,15 @@ function CampaignsContent({
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Monitoring Dashboard Link */}
-          <Button
-            variant="outline"
-            onClick={() => window.open('/campaigns/monitoring', '_blank')}
-            className="flex items-center gap-2"
-          >
-            <BarChart3 className="h-4 w-4" />
-            Monitoring Dashboard
-          </Button>
+          <Link href="/campaigns/monitoring">
+            <Button
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Monitoring Dashboard
+            </Button>
+          </Link>
 
           {/* Seed Sample Data Button - only show if no campaigns exist */}
           {filteredCampaigns.length === 0 && (
@@ -978,7 +974,7 @@ function CampaignsContent({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={confirmDeleteCampaign}
               className="bg-red-600 hover:bg-red-700"
             >
@@ -999,7 +995,7 @@ function CampaignsContent({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={confirmBulkDelete}
               className="bg-red-600 hover:bg-red-700"
             >

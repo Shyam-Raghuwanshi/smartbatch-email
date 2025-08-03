@@ -312,6 +312,94 @@ export const notifyAlert = action({
   },
 });
 
+// Send email alert for campaign issues
+export const sendAlertEmail = action({
+  args: {
+    userId: v.id("users"),
+    alerts: v.array(v.object({
+      type: v.string(),
+      message: v.string(),
+      timestamp: v.number(),
+      campaignId: v.optional(v.string()),
+    })),
+    alertType: v.union(v.literal("critical"), v.literal("warning")),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.runQuery(internal.lib.getUserById, { userId: args.userId });
+    if (!user?.email) {
+      throw new Error("User email not found");
+    }
+
+    const alertTypeText = args.alertType === "critical" ? "🚨 Critical" : "⚠️ Warning";
+    const alertCount = args.alerts.length;
+    
+    const subject = `${alertTypeText} Campaign Alert${alertCount > 1 ? 's' : ''} - SmartBatch Email`;
+    
+    let emailContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .header { background: ${args.alertType === "critical" ? "#dc2626" : "#f59e0b"}; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+        .content { padding: 20px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px; }
+        .alert-item { margin: 15px 0; padding: 15px; border-left: 4px solid ${args.alertType === "critical" ? "#dc2626" : "#f59e0b"}; background: #f9fafb; }
+        .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>${alertTypeText} Alert${alertCount > 1 ? 's' : ''} Detected</h1>
+        <p>Your email campaigns require immediate attention</p>
+    </div>
+    
+    <div class="content">
+        <p>Hello,</p>
+        <p>We've detected ${alertCount} ${args.alertType} alert${alertCount > 1 ? 's' : ''} in your email campaigns that require your attention:</p>
+        
+        ${args.alerts.map(alert => `
+        <div class="alert-item">
+            <strong>${alert.type.toUpperCase()}</strong><br>
+            ${alert.message}<br>
+            <small>Time: ${new Date(alert.timestamp).toLocaleString()}</small>
+        </div>
+        `).join('')}
+        
+        <p>Please log in to your SmartBatch Email dashboard to review and resolve these issues.</p>
+        
+        <p>
+            <a href="${process.env.NEXT_PUBLIC_APP_URL}/campaigns/monitoring" 
+               style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                View Campaign Monitoring
+            </a>
+        </p>
+    </div>
+    
+    <div class="footer">
+        <p>This is an automated alert from SmartBatch Email. If you no longer wish to receive these alerts, you can disable them in your notification settings.</p>
+    </div>
+</body>
+</html>
+    `;
+
+    try {
+      // Use the existing email sending functionality
+      await ctx.runMutation(internal.emailService.sendEmail, {
+        recipient: user.email,
+        subject,
+        htmlContent: emailContent,
+        fromEmail: process.env.NOTIFICATION_FROM_EMAIL || "notifications@smartbatch.email",
+        fromName: "SmartBatch Email Alerts",
+        trackOpens: false,
+        trackClicks: false,
+      });
+    } catch (error) {
+      console.error("Failed to send alert email:", error);
+      throw new Error("Failed to send alert email notification");
+    }
+  },
+});
+
 // Utility function to format relative time
 function formatRelativeTime(timestamp: number): string {
   const now = Date.now();

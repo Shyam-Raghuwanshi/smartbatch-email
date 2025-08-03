@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
 // Helper to get current authenticated user
@@ -104,3 +104,11 @@ export const verifyOwnership = async (ctx: any, resourceUserId: string) => {
 
   return user;
 };
+
+// Internal helper to get user by ID
+export const getUserById = internalQuery({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.userId);
+  },
+});

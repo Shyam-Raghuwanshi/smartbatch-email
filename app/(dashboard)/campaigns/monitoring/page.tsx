@@ -23,7 +23,6 @@ import { Id } from "@/convex/_generated/dataModel";
 import { RealTimeMonitoring } from '@/components/campaigns/RealTimeMonitoring';
 import { EngagementHeatmap } from '@/components/campaigns/EngagementHeatmap';
 import { SendingQueueOverview } from '@/components/campaigns/SendingQueueOverview';
-import { ComparativeCampaignAnalytics } from '@/components/campaigns/ComparativeCampaignAnalytics';
 import { AlertingSystem } from '@/components/campaigns/AlertingSystem';
 import { PerformanceCharts } from '@/components/campaigns/PerformanceCharts';
 import { toast } from "sonner";
@@ -65,6 +64,9 @@ function CampaignMonitoring() {
   const pauseCampaign = useMutation(api.campaigns.pauseCampaign);
   const resumeCampaign = useMutation(api.campaigns.resumeCampaign);
   const emergencyStopCampaign = useMutation(api.campaigns.emergencyStopCampaign);
+  
+  // Get all campaigns with status grouping
+  const allCampaigns = React.useMemo(() => mergedCampaigns, [mergedCampaigns]);
   
   // Get active campaigns (sending or scheduled)
   const activeCampaigns = React.useMemo(() => 
@@ -138,25 +140,6 @@ function CampaignMonitoring() {
           )}
         </div>
         
-        {/* Quick Stats */}
-        <div className="flex items-center gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{activeCampaigns.length}</div>
-            <div className="text-xs text-gray-500">Active</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {activeCampaigns.filter((c: any) => c.status === 'sending').length}
-            </div>
-            <div className="text-xs text-gray-500">Sending</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-red-600">
-              {alerts?.length || 0}
-            </div>
-            <div className="text-xs text-gray-500">Alerts</div>
-          </div>
-        </div>
       </div>
       
       {/* Global Alerts */}
@@ -193,38 +176,87 @@ function CampaignMonitoring() {
       {!campaignId && (
         <Card>
           <CardHeader>
-            <CardTitle>Select Campaign to Monitor</CardTitle>
-            <CardDescription>
-              Choose a campaign for detailed real-time monitoring
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Select Campaign to Monitor</CardTitle>
+                <CardDescription>
+                  Choose any campaign for detailed monitoring and analytics
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-3">
+                <select 
+                  value={heatmapDays} 
+                  onChange={(e) => setHeatmapDays(Number(e.target.value))}
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+                >
+                  <option value={7}>Last 7 days</option>
+                  <option value={14}>Last 14 days</option>
+                  <option value={30}>Last 30 days</option>
+                  <option value={90}>Last 90 days</option>
+                </select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={selectedCampaignIds.length === 0}
+                  onClick={() => {
+                    // TODO: Implement CSV export functionality
+                    toast.success("CSV export feature coming soon!");
+                  }}
+                >
+                  Export CSV
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {activeCampaigns.map((campaign: any) => (
-                <Button
-                  key={campaign._id}
-                  variant="outline"
-                  className="h-auto p-4 justify-start"
-                  onClick={() => {
-                    setSelectedCampaignIds([campaign._id]);
-                    setActiveTab("realtime");
-                  }}
-                >
-                  <div className="text-left">
-                    <div className="font-medium">{campaign.name}</div>
-                    <div className="text-sm text-gray-600">{campaign.settings.subject}</div>
-                    <Badge 
-                      variant={
-                        campaign.status === 'sending' ? 'default' :
-                        campaign.status === 'paused' ? 'secondary' : 'outline'
-                      }
-                      className="mt-1"
-                    >
-                      {campaign.status}
-                    </Badge>
-                  </div>
-                </Button>
-              ))}
+              {!allCampaigns.length && (
+                <div className="col-span-full text-center text-gray-500">
+                  No campaigns available. Create a campaign to get started.
+                </div>
+              )}
+              {allCampaigns.map((campaign: any) => {
+                const isActive = ['sending', 'scheduled', 'paused'].includes(campaign.status);
+                const isCompleted = ['completed', 'sent'].includes(campaign.status);
+                const isFailed = ['failed', 'cancelled'].includes(campaign.status);
+                const isSelected = selectedCampaignIds.includes(campaign._id);
+                
+                return (
+                  <Button
+                    key={campaign._id}
+                    variant={isSelected ? "default" : "outline"}
+                    className={`h-auto p-4 justify-start ${isSelected ? 'bg-blue-500 text-white' : ''}`}
+                    onClick={() => {
+                      setSelectedCampaignIds([campaign._id]);
+                      setActiveTab("realtime");
+                    }}
+                  >
+                    <div className="text-left w-full">
+                      <div className="font-medium">{campaign.name}</div>
+                      <div className={`text-sm mb-2 ${isSelected ? 'text-blue-100' : 'text-gray-600'}`}>
+                        {campaign.settings.subject}
+                      </div>
+                      <Badge 
+                        variant={
+                          campaign.status === 'sending' ? 'default' :
+                          campaign.status === 'paused' ? 'secondary' :
+                          campaign.status === 'scheduled' ? 'default' :
+                          isCompleted ? 'default' :
+                          isFailed ? 'destructive' : 'outline'
+                        }
+                        className={
+                          campaign.status === 'sending' ? 'bg-green-500 text-white' :
+                          campaign.status === 'scheduled' ? 'bg-blue-600 text-white' :
+                          isCompleted ? 'bg-gray-500 text-white' :
+                          isFailed ? '' : ''
+                        }
+                      >
+                        {campaign.status}
+                      </Badge>
+                    </div>
+                  </Button>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -232,7 +264,7 @@ function CampaignMonitoring() {
       
       {/* Main Dashboard Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             Overview
@@ -248,10 +280,6 @@ function CampaignMonitoring() {
           <TabsTrigger value="performance" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
             Performance
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
-            Analytics
           </TabsTrigger>
           <TabsTrigger value="alerts" className="flex items-center gap-2">
             <Bell className="h-4 w-4" />
@@ -325,14 +353,6 @@ function CampaignMonitoring() {
               </CardContent>
             </Card>
           )}
-        </TabsContent>
-        
-        {/* Comparative Analytics Tab */}
-        <TabsContent value="analytics" className="space-y-6">
-          <ComparativeCampaignAnalytics
-            selectedCampaignIds={selectedCampaignIds}
-            onCampaignSelectionChange={setSelectedCampaignIds}
-          />
         </TabsContent>
         
         {/* Alerting System Tab */}

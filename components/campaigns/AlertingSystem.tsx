@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,9 +18,7 @@ import {
   Mail,
   TrendingDown,
   TrendingUp,
-  Settings,
-  Volume2,
-  VolumeX
+  Settings
 } from 'lucide-react';
 import { toast } from "sonner";
 
@@ -93,23 +91,21 @@ const defaultRules: AlertRule[] = [
 
 export function AlertingSystem() {
   const [alertRules, setAlertRules] = useState<AlertRule[]>(defaultRules);
-  const [soundEnabled, setSoundEnabled] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
+  const [lastAlertCount, setLastAlertCount] = useState(0);
   
-  // Get current alerts
+  // Get current alerts and user info
   const alerts = useQuery(api.campaignMonitoring.getAlertTriggers, {});
+  const userId = useQuery(api.lib.getUserId);
+  const sendAlertEmail = useMutation(api.notifications.sendAlertEmail);
   
   // Load settings from localStorage on mount
   useEffect(() => {
     const savedRules = localStorage.getItem('alertRules');
-    const savedSoundEnabled = localStorage.getItem('soundEnabled');
     const savedEmailNotifications = localStorage.getItem('emailNotifications');
     
     if (savedRules) {
       setAlertRules(JSON.parse(savedRules));
-    }
-    if (savedSoundEnabled !== null) {
-      setSoundEnabled(JSON.parse(savedSoundEnabled));
     }
     if (savedEmailNotifications !== null) {
       setEmailNotifications(JSON.parse(savedEmailNotifications));
@@ -119,21 +115,39 @@ export function AlertingSystem() {
   // Save settings to localStorage
   const saveSettings = () => {
     localStorage.setItem('alertRules', JSON.stringify(alertRules));
-    localStorage.setItem('soundEnabled', JSON.stringify(soundEnabled));
     localStorage.setItem('emailNotifications', JSON.stringify(emailNotifications));
     toast.success('Alert settings saved');
   };
   
-  // Play sound for new alerts
+  // Send email notifications for new alerts
   useEffect(() => {
-    if (alerts && alerts.length > 0 && soundEnabled) {
-      const hasNewCritical = alerts.some(alert => alert.type === 'critical');
-      if (hasNewCritical) {
-        // Play alert sound (you would implement actual sound here)
-        console.log('🔊 Critical alert sound');
+    if (alerts && alerts.length > 0 && emailNotifications && userId) {
+      // Only send email if there are new alerts (more than before)
+      if (alerts.length > lastAlertCount) {
+        const newAlerts = alerts.slice(0, alerts.length - lastAlertCount);
+        const hasNewCritical = newAlerts.some(alert => alert.type === 'critical');
+        const hasNewWarning = newAlerts.some(alert => alert.type === 'warning');
+        
+        if (hasNewCritical || hasNewWarning) {
+          const alertType = hasNewCritical ? 'critical' : 'warning';
+          
+          sendAlertEmail({
+            userId,
+            alerts: newAlerts,
+            alertType
+          }).then(() => {
+            console.log('📧 Alert email sent successfully');
+            toast.success(`${alertType.charAt(0).toUpperCase() + alertType.slice(1)} alert email sent`);
+          }).catch((error) => {
+            console.error('Failed to send alert email:', error);
+            toast.error('Failed to send alert email');
+          });
+        }
       }
+      
+      setLastAlertCount(alerts.length);
     }
-  }, [alerts, soundEnabled]);
+  }, [alerts, emailNotifications, userId, sendAlertEmail, lastAlertCount]);
   
   const updateAlertRule = (ruleId: string, updates: Partial<AlertRule>) => {
     setAlertRules(prev => 
@@ -188,14 +202,6 @@ export function AlertingSystem() {
         </div>
         
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-            <Switch
-              checked={soundEnabled}
-              onCheckedChange={setSoundEnabled}
-              aria-label="Enable sound notifications"
-            />
-          </div>
           <Button onClick={saveSettings}>
             <Settings className="h-4 w-4 mr-2" />
             Save Settings
@@ -284,33 +290,18 @@ export function AlertingSystem() {
             {/* Notification Settings */}
             <div className="space-y-4">
               <h3 className="text-lg font-medium">Notification Settings</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    {soundEnabled ? <Volume2 className="h-5 w-5 text-blue-500" /> : <VolumeX className="h-5 w-5 text-gray-400" />}
-                    <div>
-                      <Label>Sound Notifications</Label>
-                      <p className="text-xs text-gray-500">Play sound for critical alerts</p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={soundEnabled}
-                    onCheckedChange={setSoundEnabled}
-                  />
-                </div>
-                
+              <div className="grid grid-cols-1 gap-4">
                 <div className="flex items-center justify-between p-4 border rounded-lg">
                   <div className="flex items-center gap-3">
                     <Mail className="h-5 w-5 text-blue-500" />
                     <div>
                       <Label>Email Notifications</Label>
-                      <p className="text-xs text-gray-500">Send email alerts (coming soon)</p>
+                      <p className="text-xs text-gray-500">Send email alerts for critical issues</p>
                     </div>
                   </div>
                   <Switch
                     checked={emailNotifications}
                     onCheckedChange={setEmailNotifications}
-                    disabled
                   />
                 </div>
               </div>
