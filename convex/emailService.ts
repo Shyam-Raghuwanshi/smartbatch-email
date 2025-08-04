@@ -427,6 +427,9 @@ export const sendBatchEmails = mutation({
         email: email.recipient,
         firstName: contact?.firstName || "",
         lastName: contact?.lastName || "",
+        name: contact?.firstName && contact?.lastName 
+          ? `${contact.firstName} ${contact.lastName}`.trim()
+          : contact?.firstName || contact?.lastName || "",
         fullName: contact?.firstName && contact?.lastName 
           ? `${contact.firstName} ${contact.lastName}`
           : contact?.firstName || contact?.lastName || "",
@@ -610,6 +613,9 @@ export const sendABTestCampaign = mutation({
           firstName: contact?.firstName || "",
           lastName: contact?.lastName || "",
           email: recipient,
+          name: contact?.firstName && contact?.lastName 
+            ? `${contact.firstName} ${contact.lastName}`.trim()
+            : contact?.firstName || contact?.lastName || "",
           fullName: contact?.firstName && contact?.lastName 
             ? `${contact.firstName} ${contact.lastName}`
             : contact?.firstName || recipient,
@@ -726,22 +732,31 @@ export const processEmailQueue = internalMutation({
     emailQueueId: v.id("emailQueue"),
   },
   handler: async (ctx, args) => {
+    console.log("🚀 Processing email queue ID:", args.emailQueueId);
+    
     const emailQueue = await ctx.db.get(args.emailQueueId);
     if (!emailQueue) {
+      console.log("❌ Email queue not found for ID:", args.emailQueueId);
       return;
     }
 
+    console.log("📧 Processing email for recipient:", emailQueue.recipient);
+    console.log("📊 Email queue status:", emailQueue.status, "attempts:", emailQueue.attemptCount);
+
     // Check if email is scheduled for future
     if (emailQueue.scheduledAt && emailQueue.scheduledAt > Date.now()) {
+      console.log("⏰ Email scheduled for future, skipping:", new Date(emailQueue.scheduledAt));
       return;
     }
 
     // Check if already processed or max attempts reached
     if (emailQueue.status !== "queued" || emailQueue.attemptCount >= emailQueue.maxAttempts) {
+      console.log("⚠️ Email not queued or max attempts reached. Status:", emailQueue.status, "attempts:", emailQueue.attemptCount);
       return;
     }
 
     try {
+      console.log("🔄 Updating email status to processing...");
       // Update status to processing
       await ctx.db.patch(emailQueue._id, {
         status: "processing",
@@ -832,7 +847,17 @@ export const processEmailQueue = internalMutation({
         emailPayload.text = fallback;
       }
       
+      console.log("📤 Sending email with payload:", {
+        to: emailQueue.recipient,
+        subject: emailQueue.subject,
+        hasHtml: !!(htmlContent && htmlContent.trim()),
+        hasText: !!(textContent && textContent.trim()),
+        fromAddress
+      });
+      
       const emailId = await ctx.runMutation(resend.lib.sendEmail, emailPayload);
+
+      console.log("✅ Email sent successfully with ID:", emailId);
 
       // Update with Resend email ID
       await ctx.db.patch(emailQueue._id, {

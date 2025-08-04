@@ -37,6 +37,8 @@ export const processEmailTemplate = internalMutation({
       ...contact?.customFields,
     };
 
+    console.log("Processing template with variables:", allVariables);
+
     // Process template content
     let htmlContent = template.htmlContent || template.content;
     let textContent = template.content;
@@ -63,7 +65,7 @@ export const processEmailTemplate = internalMutation({
 
     // Convert links for click tracking
     htmlContent = convertLinksForTracking(htmlContent, emailId, args.baseUrl);
-
+    console.log("Processed HTML content:", htmlContent);
     return {
       subject,
       htmlContent,

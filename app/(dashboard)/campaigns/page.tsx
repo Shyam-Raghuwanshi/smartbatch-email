@@ -245,10 +245,12 @@ function CampaignPageContent() {
   }, [mergedCampaigns]);
 
   const handleStatusChange = async (campaignId: Id<"campaigns">, newStatus: CampaignStatus) => {
+    console.log("🚀 Send Now clicked! Changing campaign status:", { campaignId, newStatus });
     try {
       await updateCampaign({ id: campaignId, status: newStatus });
+      console.log("✅ Campaign status updated successfully");
     } catch (error) {
-      console.error('Failed to update campaign status:', error);
+      console.error('❌ Failed to update campaign status:', error);
     }
   };
 

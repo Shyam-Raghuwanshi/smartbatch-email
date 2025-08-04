@@ -328,10 +328,12 @@ export const updateCampaign = mutation({
     
     // If status is changing to "sending", we need to queue emails
     if (updates.status === "sending" && campaign.status !== "sending") {
+      console.log("🚀 Campaign status changing to 'sending', queuing emails for campaign:", id);
       await ctx.runMutation(internal.campaigns.queueCampaignEmails, {
         campaignId: id,
         userId: user._id,
       });
+      console.log("✅ Campaign emails queued successfully for campaign:", id);
     }
     
     // If status is changing to "sent", create a completion notification
@@ -672,8 +674,11 @@ export const queueCampaignEmails = internalMutation({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
+    console.log("📋 Starting to queue campaign emails for campaign:", args.campaignId);
+    
     const campaign = await ctx.db.get(args.campaignId);
     if (!campaign || !campaign.settings) {
+      console.log("❌ Campaign not found or missing settings:", args.campaignId);
       throw new Error("Campaign not found or missing settings");
     }
 
@@ -735,6 +740,7 @@ export const queueCampaignEmails = internalMutation({
       htmlContent = htmlContent.replace(/{{lastName}}/g, contact.lastName || "");
       htmlContent = htmlContent.replace(/{{email}}/g, contact.email || "");
       htmlContent = htmlContent.replace(/{{company}}/g, contact.company || "");
+      htmlContent = htmlContent.replace(/{{companyName}}/g, contact.company || "");
       
       // Handle {variable} format for backward compatibility  
       htmlContent = htmlContent.replace(/{name}/g, name);
@@ -742,6 +748,7 @@ export const queueCampaignEmails = internalMutation({
       htmlContent = htmlContent.replace(/{lastName}/g, contact.lastName || "");
       htmlContent = htmlContent.replace(/{email}/g, contact.email || "");
       htmlContent = htmlContent.replace(/{company}/g, contact.company || "");
+      htmlContent = htmlContent.replace(/{companyName}/g, contact.company || "");
       
       // Apply same replacements to text and subject
       textContent = textContent.replace(/{{name}}/g, name);
@@ -749,22 +756,26 @@ export const queueCampaignEmails = internalMutation({
       textContent = textContent.replace(/{{lastName}}/g, contact.lastName || "");
       textContent = textContent.replace(/{{email}}/g, contact.email || "");
       textContent = textContent.replace(/{{company}}/g, contact.company || "");
+      textContent = textContent.replace(/{{companyName}}/g, contact.company || "");
       textContent = textContent.replace(/{name}/g, name);
       textContent = textContent.replace(/{firstName}/g, contact.firstName || "");
       textContent = textContent.replace(/{lastName}/g, contact.lastName || "");
       textContent = textContent.replace(/{email}/g, contact.email || "");
       textContent = textContent.replace(/{company}/g, contact.company || "");
+      textContent = textContent.replace(/{companyName}/g, contact.company || "");
       
       subject = subject.replace(/{{name}}/g, name);
       subject = subject.replace(/{{firstName}}/g, contact.firstName || "");
       subject = subject.replace(/{{lastName}}/g, contact.lastName || "");
       subject = subject.replace(/{{email}}/g, contact.email || "");
       subject = subject.replace(/{{company}}/g, contact.company || "");
+      subject = subject.replace(/{{companyName}}/g, contact.company || "");
       subject = subject.replace(/{name}/g, name);
       subject = subject.replace(/{firstName}/g, contact.firstName || "");
       subject = subject.replace(/{lastName}/g, contact.lastName || "");
       subject = subject.replace(/{email}/g, contact.email || "");
       subject = subject.replace(/{company}/g, contact.company || "");
+      subject = subject.replace(/{companyName}/g, contact.company || "");
 
       const user = await ctx.db.get(args.userId);
       if (!user) throw new Error("User not found");
@@ -831,6 +842,13 @@ export const queueCampaignEmails = internalMutation({
 
       emailQueueIds.push(emailQueueId);
     }
+
+    console.log("✅ Campaign email queuing completed!");
+    console.log("📊 Results:", {
+      totalTargetContacts: targetContacts.length,
+      emailsQueued: emailQueueIds.length,
+      emailsSkipped: targetContacts.length - emailQueueIds.length
+    });
 
     return { emailsQueued: emailQueueIds.length, skippedContacts: targetContacts.length - emailQueueIds.length };
   },
