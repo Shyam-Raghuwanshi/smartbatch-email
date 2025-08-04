@@ -88,7 +88,7 @@ function SettingsContent() {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <div className="flex-shrink-0 px-6 py-4 border-b bg-white">
-        <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
+        <h2 className="text-2xl pb-2 font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
           Settings
         </h2>
         <p className="mt-2 text-sm text-gray-700">
