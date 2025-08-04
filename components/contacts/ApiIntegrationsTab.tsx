@@ -9,54 +9,16 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Globe, CheckCircle, AlertTriangle, RefreshCw, Download } from "lucide-react";
 import { ApiIntegration } from "@/components/integrations/ApiIntegration";
+import { ApiDocumentationModal } from "@/components/integrations/ApiDocumentationModal";
 
 export function ApiIntegrationsTab() {
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showApiDocsModal, setShowApiDocsModal] = useState(false);
   
   const apiIntegrations = useQuery(api.apiIntegrations.getUserApiIntegrations);
 
   const handleDownloadDocs = () => {
-    // This would download API documentation
-    const docContent = `
-API Integration Documentation
-
-Endpoint: https://api.smartbatch.com/v1/contacts/import
-Method: POST
-Headers:
-  Authorization: Bearer YOUR_API_KEY
-  Content-Type: application/json
-
-Body Format:
-{
-  "contacts": [
-    {
-      "email": "user@example.com",
-      "firstName": "John",
-      "lastName": "Doe",
-      "phone": "+1234567890",
-      "company": "Acme Corp",
-      "position": "Developer",
-      "tags": ["lead", "premium"]
-    }
-  ]
-}
-
-Response:
-{
-  "success": true,
-  "imported": 1,
-  "failed": 0,
-  "errors": []
-}
-    `;
-
-    const blob = new Blob([docContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'smartbatch-api-documentation.txt';
-    a.click();
-    URL.revokeObjectURL(url);
+    setShowApiDocsModal(true);
   };
 
   if (apiIntegrations === undefined) {
@@ -180,8 +142,7 @@ Response:
           </Alert>
           
           <Button variant="outline" onClick={handleDownloadDocs}>
-            <Download className="h-4 w-4 mr-2" />
-            Download API Documentation
+            API Documentation
           </Button>
         </CardContent>
       </Card>
@@ -191,6 +152,12 @@ Response:
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         mode="create"
+      />
+
+      {/* API Documentation Modal */}
+      <ApiDocumentationModal
+        isOpen={showApiDocsModal}
+        onClose={() => setShowApiDocsModal(false)}
       />
     </div>
   );
