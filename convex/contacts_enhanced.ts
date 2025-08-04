@@ -180,7 +180,9 @@ export const updateContact = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
 
-    const contact = await ctx.db.get(args.contactId);
+    const { contactId, ...updateData } = args;
+
+    const contact = await ctx.db.get(contactId);
     if (!contact) throw new Error("Contact not found");
 
     // Verify ownership
@@ -194,10 +196,10 @@ export const updateContact = mutation({
     }
 
     // Check for duplicate email if email is being updated
-    if (args.email && args.email !== contact.email) {
+    if (updateData.email && updateData.email !== contact.email) {
       const existingContact = await ctx.db
         .query("contacts")
-        .withIndex("by_email", (q) => q.eq("email", args.email!))
+        .withIndex("by_email", (q) => q.eq("email", updateData.email!))
         .filter((q) => q.eq(q.field("userId"), user._id))
         .first();
 
@@ -205,9 +207,9 @@ export const updateContact = mutation({
         throw new Error("Contact with this email already exists");
       }
     }
-
-    await ctx.db.patch(args.contactId, {
-      ...args,
+    
+    await ctx.db.patch(contactId, {
+      ...updateData,
       updatedAt: Date.now(),
     });
   },

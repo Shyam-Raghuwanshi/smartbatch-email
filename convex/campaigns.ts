@@ -719,6 +719,13 @@ export const queueCampaignEmails = internalMutation({
         }
       }
 
+      // Ensure we have some content - if both are empty, provide fallback
+      if (!htmlContent.trim() && !textContent.trim()) {
+        const fallbackContent = "This is an email from your SmartBatch campaign.";
+        htmlContent = `<p>${fallbackContent}</p>`;
+        textContent = fallbackContent;
+      }
+
       // Replace variables with both formats for compatibility
       const name = `${contact.firstName || ""} ${contact.lastName || ""}`.trim();
       

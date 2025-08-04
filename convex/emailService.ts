@@ -282,6 +282,15 @@ export const sendEmail = mutation({
     const unsubscribeLink = `${process.env.CONVEX_SITE_URL}/unsubscribe?token=${unsubscribeToken}`;
     htmlContent = injectUnsubscribeLink(htmlContent, unsubscribeLink);
 
+    // Ensure we have some content - provide fallback if both are empty
+    if (!htmlContent.trim() && (!textContent || !textContent.trim())) {
+      const fallbackContent = "This is an email from SmartBatch Email.";
+      htmlContent = `<p>${fallbackContent}</p>`;
+      textContent = fallbackContent;
+      // Re-inject unsubscribe link for fallback content
+      htmlContent = injectUnsubscribeLink(htmlContent, unsubscribeLink);
+    }
+
     // Create email queue entry
     const emailQueueId = await ctx.db.insert("emailQueue", {
       userId: user._id,
@@ -448,6 +457,15 @@ export const sendBatchEmails = mutation({
       const unsubscribeLink = `${process.env.CONVEX_SITE_URL}/unsubscribe?token=${unsubscribeToken}`;
       htmlContent = injectUnsubscribeLink(htmlContent, unsubscribeLink);
 
+      // Ensure we have some content - provide fallback if both are empty
+      if (!htmlContent.trim() && (!textContent || !textContent.trim())) {
+        const fallbackContent = "This is an email from your SmartBatch campaign.";
+        htmlContent = `<p>${fallbackContent}</p>`;
+        textContent = fallbackContent;
+        // Re-inject unsubscribe link for fallback content
+        htmlContent = injectUnsubscribeLink(htmlContent, unsubscribeLink);
+      }
+
       const emailQueueId = await ctx.db.insert("emailQueue", {
         userId: user._id,
         campaignId: args.campaignId,
@@ -585,7 +603,7 @@ export const sendABTestCampaign = mutation({
         // Process variant configuration
         let { subject, customContent, templateId, fromName, fromEmail } = variant.campaignConfig;
         let htmlContent = customContent || "";
-        let textContent = "";
+        let textContent = customContent || "";
 
         // Build allVariables for template replacement
         const allVariables = {
@@ -618,6 +636,15 @@ export const sendABTestCampaign = mutation({
         const unsubscribeToken = crypto.randomUUID();
         const unsubscribeLink = `${process.env.CONVEX_SITE_URL}/unsubscribe?token=${unsubscribeToken}`;
         htmlContent = injectUnsubscribeLink(htmlContent, unsubscribeLink);
+
+        // Ensure we have some content - provide fallback if both are empty
+        if (!htmlContent.trim() && (!textContent || !textContent.trim())) {
+          const fallbackContent = "This is an email from your SmartBatch A/B test campaign.";
+          htmlContent = `<p>${fallbackContent}</p>`;
+          textContent = fallbackContent;
+          // Re-inject unsubscribe link for fallback content
+          htmlContent = injectUnsubscribeLink(htmlContent, unsubscribeLink);
+        }
 
         // Create email queue entry
         const emailQueueId = await ctx.db.insert("emailQueue", {
@@ -753,12 +780,30 @@ export const processEmailQueue = internalMutation({
         throw new Error("Email settings not configured. Please go to Settings → Email Configuration to set up your Resend API key and domain. If you have configurations but see this error, ensure one is marked as 'Default' and 'Active'.");
       }
       
-      const emailId = await ctx.runMutation(resend.lib.sendEmail, {
+      // Ensure at least one of html or text content is provided (Resend requirement)
+      let htmlContent = emailQueue.htmlContent || "";
+      let textContent = emailQueue.textContent || "";
+      
+      // If both are empty or just whitespace, provide fallback content
+      if (!htmlContent.trim() && (!textContent || !textContent.trim())) {
+        const fallbackContent = "This is an email from SmartBatch Email.";
+        htmlContent = `<p>${fallbackContent}</p>`;
+        textContent = fallbackContent;
+      }
+      
+      // Ensure at least one field has content (not just empty string)
+      if (!htmlContent.trim() && textContent && textContent.trim()) {
+        // Only text content available
+        htmlContent = "";
+      } else if (htmlContent.trim() && (!textContent || !textContent.trim())) {
+        // Only HTML content available  
+        textContent = "";
+      }
+      
+      const emailPayload: any = {
         from: fromAddress,
         to: emailQueue.recipient,
         subject: emailQueue.subject,
-        html: emailQueue.htmlContent,
-        text: emailQueue.textContent,
         replyTo: emailQueue.replyTo ? [emailQueue.replyTo] : undefined,
         options: {
           apiKey: apiKey,
@@ -769,7 +814,25 @@ export const processEmailQueue = internalMutation({
             fnHandle: "emailService:handleEmailEvent"
           }
         }
-      });
+      };
+      
+      // Add content fields only if they have actual content
+      if (htmlContent && htmlContent.trim()) {
+        emailPayload.html = htmlContent;
+      }
+      if (textContent && textContent.trim()) {
+        emailPayload.text = textContent;
+      }
+      
+      // Ensure at least one content type is provided
+      if (!emailPayload.html && !emailPayload.text) {
+        // This should not happen due to fallback content, but just in case
+        const fallback = "This is an email from SmartBatch Email.";
+        emailPayload.html = `<p>${fallback}</p>`;
+        emailPayload.text = fallback;
+      }
+      
+      const emailId = await ctx.runMutation(resend.lib.sendEmail, emailPayload);
 
       // Update with Resend email ID
       await ctx.db.patch(emailQueue._id, {

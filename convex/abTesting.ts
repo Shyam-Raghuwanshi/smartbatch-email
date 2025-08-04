@@ -791,13 +791,23 @@ export const rolloutWinner = mutation({
     // Create email queue entries for rollout
     const emailQueueIds: Id<"emailQueue">[] = [];
     for (const contact of remainingContacts) {
+      // Ensure we have content - provide fallback if empty
+      let htmlContent = winningVariant.campaignConfig.customContent || "";
+      let textContent = winningVariant.campaignConfig.customContent || "";
+      
+      if (!htmlContent.trim() && !textContent.trim()) {
+        const fallbackContent = "This is an email from your SmartBatch A/B test campaign.";
+        htmlContent = `<p>${fallbackContent}</p>`;
+        textContent = fallbackContent;
+      }
+      
       const emailQueueId = await ctx.db.insert("emailQueue", {
         userId: user._id,
         campaignId,
         recipient: contact.email,
         subject: winningVariant.campaignConfig.subject,
-        htmlContent: winningVariant.campaignConfig.customContent || "",
-        textContent: winningVariant.campaignConfig.customContent || "",
+        htmlContent,
+        textContent,
         fromEmail: winningVariant.campaignConfig.fromEmail || user.email,
         fromName: winningVariant.campaignConfig.fromName || user.name,
         status: "queued",

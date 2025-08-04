@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "convex/react";
@@ -13,10 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
-import { X, Plus, Check, ChevronsUpDown } from "lucide-react";
+import { X, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const contactSchema = z.object({
@@ -57,11 +55,9 @@ export function ContactFormModal({ open, onOpenChange, contact }: ContactFormMod
   const [customFieldKey, setCustomFieldKey] = useState("");
   const [customFieldValue, setCustomFieldValue] = useState("");
   const [customFields, setCustomFields] = useState<Record<string, string>>(contact?.customFields || {});
-  const [companyOpen, setCompanyOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>(contact?.tags || []);
 
   const availableTags = useQuery(api.contacts_enhanced.getTags) || [];
-  const availableCompanies = useQuery(api.contacts_enhanced.getCompanies) || [];
 
   const createContact = useMutation(api.contacts_enhanced.createContact);
   const updateContact = useMutation(api.contacts_enhanced.updateContact);
@@ -88,7 +84,35 @@ export function ContactFormModal({ open, onOpenChange, contact }: ContactFormMod
     },
   });
 
-  const selectedCompany = watch("company");
+  // Update form values when contact prop changes
+  useEffect(() => {
+    if (contact) {
+      setValue("email", contact.email);
+      setValue("firstName", contact.firstName || "");
+      setValue("lastName", contact.lastName || "");
+      setValue("phone", contact.phone || "");
+      setValue("company", contact.company || "");
+      setValue("position", contact.position || "");
+      setValue("isActive", contact.isActive ?? true);
+      setSelectedTags(contact.tags || []);
+      setCustomFields(contact.customFields || {});
+    } else {
+      // Reset form for new contact
+      reset({
+        email: "",
+        firstName: "",
+        lastName: "",
+        phone: "",
+        company: "",
+        position: "",
+        tags: [],
+        isActive: true,
+        customFields: {},
+      });
+      setSelectedTags([]);
+      setCustomFields({});
+    }
+  }, [contact, setValue, reset]);
 
   const onSubmit = async (data: ContactFormData) => {
     try {
@@ -217,47 +241,11 @@ export function ContactFormModal({ open, onOpenChange, contact }: ContactFormMod
             
             <div>
               <Label htmlFor="company">Company</Label>
-              <Popover open={companyOpen} onOpenChange={setCompanyOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={companyOpen}
-                    className="w-full justify-between"
-                  >
-                    {selectedCompany || "Select company..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
-                  <Command>
-                    <CommandInput 
-                      placeholder="Search companies..." 
-                      onValueChange={(value) => setValue("company", value)}
-                    />
-                    <CommandEmpty>No company found.</CommandEmpty>
-                    <CommandGroup>
-                      {availableCompanies.map((company) => (
-                        <CommandItem
-                          key={company}
-                          onSelect={() => {
-                            setValue("company", company);
-                            setCompanyOpen(false);
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              selectedCompany === company ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {company}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <Input
+                id="company"
+                {...register("company")}
+                placeholder="Enter company name"
+              />
             </div>
 
             <div>

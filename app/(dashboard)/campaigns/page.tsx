@@ -654,9 +654,11 @@ function CampaignsContent({
       {/* Filters and Search */}
       <Card>
         <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <Label htmlFor="search">Search Campaigns</Label>
+          <div className="flex flex-col sm:flex-row gap-6">
+            <div className="flex-1 space-y-2">
+              <Label htmlFor="search" className="text-sm font-medium text-gray-700">
+                Search Campaigns
+              </Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -668,8 +670,10 @@ function CampaignsContent({
                 />
               </div>
             </div>
-            <div className="w-full sm:w-48">
-              <Label htmlFor="status-filter">Filter by Status</Label>
+            <div className="w-full sm:w-48 space-y-2">
+              <Label htmlFor="status-filter" className="text-sm font-medium text-gray-700">
+                Filter by Status
+              </Label>
               <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
                 <SelectTrigger>
                   <SelectValue />

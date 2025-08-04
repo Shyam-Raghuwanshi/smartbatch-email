@@ -27,6 +27,8 @@ export function ContactsDashboard() {
   const [selectedContacts, setSelectedContacts] = useState<Id<"contacts">[]>([]);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showAddContactModal, setShowAddContactModal] = useState(false);
+  const [showEditContactModal, setShowEditContactModal] = useState(false);
+  const [editingContact, setEditingContact] = useState<any>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedContact, setSelectedContact] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(0);
@@ -113,6 +115,11 @@ export function ContactsDashboard() {
     a.click();
     URL.revokeObjectURL(url);
   }, [contacts, selectedContacts]);
+
+  const handleEditContact = useCallback((contact: any) => {
+    setEditingContact(contact);
+    setShowEditContactModal(true);
+  }, []);
 
   const clearFilters = useCallback(() => {
     setSearchTerm("");
@@ -275,6 +282,7 @@ export function ContactsDashboard() {
             onSelectContact={handleSelectContact}
             onSelectAll={handleSelectAll}
             onContactClick={setSelectedContact}
+            onEditContact={handleEditContact}
             loading={contactsData === undefined}
           />
 
@@ -308,6 +316,17 @@ export function ContactsDashboard() {
           <ContactFormModal
             open={showAddContactModal}
             onOpenChange={setShowAddContactModal}
+          />
+
+          <ContactFormModal
+            open={showEditContactModal}
+            onOpenChange={(open) => {
+              setShowEditContactModal(open);
+              if (!open) {
+                setEditingContact(null);
+              }
+            }}
+            contact={editingContact}
           />
 
           {selectedContact && (

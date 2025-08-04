@@ -64,6 +64,7 @@ interface ContactsTableProps {
   onSelectContact: (contactId: Id<"contacts">, selected: boolean) => void;
   onSelectAll: (selected: boolean) => void;
   onContactClick: (contact: Contact) => void;
+  onEditContact?: (contact: Contact) => void;
   loading?: boolean;
 }
 
@@ -82,6 +83,7 @@ export function ContactsTable({
   onSelectContact,
   onSelectAll,
   onContactClick,
+  onEditContact,
   loading = false,
 }: ContactsTableProps) {
   // Performance monitoring
@@ -364,7 +366,7 @@ export function ContactsTable({
                   <Eye className="mr-2 h-4 w-4" />
                   View Details
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onEditContact?.(contact)}>
                   <Edit className="mr-2 h-4 w-4" />
                   Edit Contact
                 </DropdownMenuItem>
@@ -385,6 +387,7 @@ export function ContactsTable({
     getEngagementRate,
     formatDate,
     onContactClick,
+    onEditContact,
     handleRowSelect
   ]);
 
