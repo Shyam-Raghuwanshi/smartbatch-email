@@ -31,6 +31,7 @@ import { SchedulingInterface } from '@/components/campaigns/SchedulingInterface'
 interface CampaignFormProps {
   campaignId?: Id<"campaigns">;
   onSuccess: () => void;
+  initialTags?: string[];
 }
 
 type ScheduleType = 'immediate' | 'scheduled' | 'recurring';
@@ -58,7 +59,7 @@ interface FormData {
   };
 }
 
-export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
+export function CampaignForm({ campaignId, onSuccess, initialTags = [] }: CampaignFormProps) {
   const existingCampaign = useQuery(api.campaigns.getCampaignById, 
     campaignId ? { id: campaignId } : 'skip'
   );
@@ -74,7 +75,7 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
   const [formData, setFormData] = useState<FormData>({
     name: '',
     subject: '',
-    targetTags: [],
+    targetTags: initialTags,
     scheduleType: 'immediate',
     sendDelay: 5,
     trackOpens: true,

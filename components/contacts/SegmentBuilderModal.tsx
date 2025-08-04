@@ -5,6 +5,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
+import { Contact } from "@/types/convex";
 import { z } from "zod";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -192,15 +194,16 @@ export function SegmentBuilderModal({ open, onOpenChange, segment }: SegmentBuil
     }));
   };
 
-  const handlePreview = async () => {
-    try {
-      const result = await previewSegmentContacts({ filters });
-      setPreviewData(result);
-      setShowPreview(true);
-    } catch (error) {
-      console.error("Error previewing contacts:", error);
-    }
+  const handlePreview = () => {
+    setShowPreview(true);
   };
+
+  // Update preview data when the query result changes
+  useEffect(() => {
+    if (previewSegmentContacts && showPreview) {
+      setPreviewData(previewSegmentContacts);
+    }
+  }, [previewSegmentContacts, showPreview]);
 
   const hasFilters = filters.tags.length > 0 || 
                    filters.companies.length > 0 || 

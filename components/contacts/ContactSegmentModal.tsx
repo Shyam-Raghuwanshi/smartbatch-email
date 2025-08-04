@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
+import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +56,7 @@ interface ContactSegmentModalProps {
 export function ContactSegmentModal({ segment, open, onOpenChange }: ContactSegmentModalProps) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   const segmentContacts = useQuery(
     api.contact_segments.getContactsBySegment,
@@ -108,6 +111,19 @@ export function ContactSegmentModal({ segment, open, onOpenChange }: ContactSegm
     a.download = `${segment.name.replace(/[^a-z0-9]/gi, '_')}-contacts.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleCreateCampaign = () => {
+    // Extract tags from the segment filters to pre-populate the campaign
+    const tags = segment.filters.tags || [];
+    const queryParams = new URLSearchParams();
+    
+    if (tags.length > 0) {
+      queryParams.set('tags', tags.join(','));
+    }
+    
+    // Navigate to campaigns page with pre-selected segment tags
+    router.push(`/campaigns?${queryParams.toString()}`);
   };
 
   const getFilterSummary = () => {
@@ -185,7 +201,7 @@ export function ContactSegmentModal({ segment, open, onOpenChange }: ContactSegm
               <Download className="mr-2 h-4 w-4" />
               Export Contacts
             </Button>
-            <Button variant="outline">
+            <Button onClick={handleCreateCampaign} variant="outline">
               <Plus className="mr-2 h-4 w-4" />
               Create Campaign
             </Button>

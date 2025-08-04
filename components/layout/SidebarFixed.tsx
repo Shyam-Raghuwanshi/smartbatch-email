@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { 
   Home,
   Mail,
@@ -26,9 +28,10 @@ export interface NavItem {
   badge?: string;
 }
 
-const navigation: NavItem[] = [
+// Function to create navigation items with dynamic data
+const createNavigation = (campaignCount: number): NavItem[] => [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Campaigns', href: '/campaigns', icon: Mail, badge: '3' },
+  { name: 'Campaigns', href: '/campaigns', icon: Mail, badge: campaignCount > 0 ? campaignCount.toString() : undefined },
   { name: 'Templates', href: '/templates', icon: FileText },
   { name: 'Contacts', href: '/contacts', icon: Users },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
@@ -43,6 +46,8 @@ interface SidebarProps {
 // Desktop Sidebar Component
 function DesktopSidebar({ className }: { className?: string }) {
   const pathname = usePathname();
+  const campaigns = useQuery(api.campaigns.getUserCampaigns) || [];
+  const navigation = createNavigation(campaigns.length);
 
   return (
     <div className={cn("hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col", className)}>
@@ -100,6 +105,8 @@ function DesktopSidebar({ className }: { className?: string }) {
 // Mobile Sidebar Component
 function MobileSidebar() {
   const pathname = usePathname();
+  const campaigns = useQuery(api.campaigns.getUserCampaigns) || [];
+  const navigation = createNavigation(campaigns.length);
 
   return (
     <Sheet>

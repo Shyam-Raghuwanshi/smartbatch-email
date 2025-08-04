@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useQuery, useMutation, useConvexAuth, Authenticated, Unauthenticated, AuthLoading } from 'convex/react';
 import { useUser } from '@clerk/nextjs';
+import { useSearchParams } from 'next/navigation';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { Button } from '@/components/ui/button';
@@ -104,7 +105,8 @@ const statusConfig = {
   },
 };
 
-export default function CampaignsPage() {
+// Separate component that uses useSearchParams to avoid Suspense boundary issues
+function CampaignPageContent() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const { user, isLoaded: userLoaded } = useUser();
   const userId = useQuery(api.lib.getUserId);
@@ -115,7 +117,19 @@ export default function CampaignsPage() {
   const testAuth = useQuery(api.test.testAuth);
   const testPublic = useQuery(api.test.testPublic);
 
-  // Merge real-time updates with campaign data
+  // Handle URL parameters for pre-populating campaign form
+  const searchParams = useSearchParams();
+  const [initialTags, setInitialTags] = useState<string[]>([]);
+
+  // Handle URL parameters when component mounts
+  useEffect(() => {
+    const tagsParam = searchParams.get('tags');
+    if (tagsParam) {
+      const tags = tagsParam.split(',').map(tag => tag.trim()).filter(Boolean);
+      setInitialTags(tags);
+      setIsNewCampaignOpen(true); // Auto-open the campaign creation modal
+    }
+  }, [searchParams]);
   const mergedCampaigns = useMemo(() => {
     if (!campaigns) return [];
     if (!campaignUpdates) return campaigns;
@@ -146,7 +160,7 @@ export default function CampaignsPage() {
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [campaignToDelete, setCampaignToDelete] = useState<Id<"campaigns"> | null>(null);
 
-  // Utility functions
+  // Merge real-time updates with campaign data
   const formatDate = (date: number) => {
     return new Date(date).toLocaleDateString('en-US', {
       month: 'short',
@@ -420,6 +434,8 @@ export default function CampaignsPage() {
           campaignToDelete={campaignToDelete}
           confirmDeleteCampaign={confirmDeleteCampaign}
           confirmBulkDelete={confirmBulkDelete}
+          initialTags={initialTags}
+          setInitialTags={setInitialTags}
         />
       </Authenticated>
     </>
@@ -465,7 +481,9 @@ function CampaignsContent({
   setBulkDeleteDialogOpen,
   campaignToDelete,
   confirmDeleteCampaign,
-  confirmBulkDelete
+  confirmBulkDelete,
+  initialTags,
+  setInitialTags
 }: {
   campaigns: any[];
   mergedCampaigns: any[];
@@ -506,6 +524,8 @@ function CampaignsContent({
   campaignToDelete: Id<"campaigns"> | null;
   confirmDeleteCampaign: () => void;
   confirmBulkDelete: () => void;
+  initialTags: string[];
+  setInitialTags: (tags: string[]) => void;
 }) {
   const StatusBadge = ({ status }: { status: CampaignStatus }) => {
     const config = statusConfig[status];
@@ -586,7 +606,13 @@ function CampaignsContent({
                   Set up your email campaign with templates, recipients, and scheduling options.
                 </DialogDescription>
               </DialogHeader>
-              <CampaignForm onSuccess={() => setIsNewCampaignOpen(false)} />
+              <CampaignForm 
+                onSuccess={() => {
+                  setIsNewCampaignOpen(false);
+                  setInitialTags([]); // Reset initial tags after successful creation
+                }} 
+                initialTags={initialTags}
+              />
             </DialogContent>
           </Dialog>
         </div>
@@ -1009,5 +1035,35 @@ function CampaignsContent({
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+// Loading component for Suspense fallback
+function CampaignsLoading() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Campaigns</h1>
+          <p className="text-muted-foreground">Loading campaigns...</p>
+        </div>
+      </div>
+      <div className="space-y-4">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="animate-pulse">
+            <div className="h-20 bg-muted rounded-lg" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Main exported component with Suspense boundary
+export default function CampaignsPage() {
+  return (
+    <Suspense fallback={<CampaignsLoading />}>
+      <CampaignPageContent />
+    </Suspense>
   );
 }

@@ -106,10 +106,6 @@ export function ContactSegments() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={refreshCounts} variant="outline">
-            <Filter className="mr-2 h-4 w-4" />
-            Refresh Counts
-          </Button>
           <Button onClick={() => setShowSegmentBuilder(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Create Segment
@@ -135,7 +131,7 @@ export function ContactSegments() {
       {/* Segments Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredSegments.map((segment) => (
-          <Card key={segment._id} className="cursor-pointer hover:shadow-md transition-shadow">
+          <Card key={segment._id} className="hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
