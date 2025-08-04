@@ -680,7 +680,7 @@ function TemplateEditor() {
 
           {/* Right Panel - Editor and Preview */}
           <ResizablePanel defaultSize={60} minSize={40}>
-            <div className="h-full flex flex-col">
+            <div className="h-screen overflow-y-auto pb-40 flex flex-col">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
                 <div className="border-b px-4 py-2 flex items-center justify-between overflow-x-auto">
                   <TabsList className="w-auto flex-shrink-0">
@@ -769,7 +769,6 @@ function TemplateEditor() {
                         content={formData.content}
                         onChange={(content: string) => setFormData(prev => ({ ...prev, content }))}
                         variables={formData.variables}
-                        className="h-full"
                       />
                     </div>
                   </div>
@@ -960,7 +959,7 @@ function TemplateEditor() {
                           </div>
 
                           {optimizationResults.recommendations && optimizationResults.recommendations.length > 0 && (
-                            <div>
+                            <div className='pb-20'>
                               <h4 className="font-medium mb-2">AI Recommendations:</h4>
                               <ul className="space-y-2">
                                 {optimizationResults.recommendations.map((rec, index) => (
