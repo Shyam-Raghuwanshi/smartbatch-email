@@ -222,9 +222,43 @@ export function CampaignDetailModal({ campaignId, isOpen, onClose }: CampaignDet
                 <div>
                   <label className="text-sm font-medium text-gray-600">Content</label>
                   <div className="mt-1 p-4 bg-gray-50 rounded-md border max-h-64 overflow-y-auto">
-                    <div className="text-sm text-gray-900 whitespace-pre-wrap">
-                      {template?.content || campaign.settings.customContent || 'No content available'}
-                    </div>
+                    {(() => {
+                      // Use HTML content if available from template, fallback to plain content
+                      const content = template?.htmlContent || template?.content || campaign.settings.customContent || 'No content available';
+                      
+                      // Check if content contains HTML tags
+                      const isHTML = /<[^>]*>/g.test(content);
+                      
+                      if (isHTML) {
+                        return (
+                          <div 
+                            className="text-sm email-content-preview"
+                            dangerouslySetInnerHTML={{ __html: content }}
+                            style={{
+                              backgroundColor: '#ffffff',
+                              padding: '1rem',
+                              borderRadius: '0.375rem',
+                              border: '1px solid #e5e7eb',
+                              fontSize: '14px'
+                            }}
+                          />
+                        );
+                      } else {
+                        return (
+                          <div 
+                            className="text-sm text-gray-900 whitespace-pre-wrap"
+                            style={{
+                              backgroundColor: '#ffffff',
+                              padding: '1rem',
+                              borderRadius: '0.375rem',
+                              border: '1px solid #e5e7eb'
+                            }}
+                          >
+                            {content}
+                          </div>
+                        );
+                      }
+                    })()}
                   </div>
                 </div>
 

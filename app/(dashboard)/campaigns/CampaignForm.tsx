@@ -79,6 +79,7 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
     sendDelay: 5,
     trackOpens: true,
     trackClicks: true,
+    emailConfig: {},
   });
 
   const [newTag, setNewTag] = useState('');
@@ -160,6 +161,29 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
       });
     }
   }, [existingCampaign]);
+
+  // Set default email settings for new campaigns
+  useEffect(() => {
+    if (!campaignId && emailSettings && emailSettings.length > 0 && !formData.emailConfig?.emailSettingsId) {
+      // First try to find a setting marked as default
+      let defaultSetting = emailSettings.find(setting => setting.isDefault);
+      
+      // If no setting is marked as default, use the first available setting
+      if (!defaultSetting) {
+        defaultSetting = emailSettings[0];
+      }
+      
+      if (defaultSetting) {
+        setFormData(prev => ({
+          ...prev,
+          emailConfig: {
+            ...prev.emailConfig,
+            emailSettingsId: defaultSetting._id,
+          }
+        }));
+      }
+    }
+  }, [emailSettings, campaignId, formData.emailConfig?.emailSettingsId]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -389,12 +413,12 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                   <div>
                     <Label htmlFor="emailSettings">Email Service</Label>
                     <Select
-                      value={formData.emailConfig?.emailSettingsId || "default"}
+                      value={formData.emailConfig?.emailSettingsId || ""}
                       onValueChange={(value) => setFormData(prev => ({
                         ...prev,
                         emailConfig: {
                           ...prev.emailConfig,
-                          emailSettingsId: value === "default" ? undefined : value as Id<"emailSettings">
+                          emailSettingsId: value === "" ? undefined : value as Id<"emailSettings">
                         }
                       }))}
                     >
@@ -402,9 +426,6 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                         <SelectValue placeholder="Select email configuration" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="default">
-                          Default (SmartBatch Default)
-                        </SelectItem>
                         {emailSettings?.map((setting) => (
                           <SelectItem key={setting._id} value={setting._id}>
                             {setting.name} - {setting.configuration.domain}
@@ -652,9 +673,29 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                         <p className="break-words"><strong>Subject:</strong> {template.subject}</p>
                         <p className="mt-2"><strong>Content:</strong></p>
                         <div className="mt-1 p-2 bg-white rounded border text-xs overflow-hidden">
-                          <div className="break-words whitespace-pre-wrap">
-                            {template.content.substring(0, 200)}...
-                          </div>
+                          {(() => {
+                            // Use HTML content if available, fallback to plain content
+                            const content = template.htmlContent || template.content;
+                            const previewContent = content.substring(0, 200) + (content.length > 200 ? '...' : '');
+                            
+                            // Check if content contains HTML tags
+                            const isHTML = /<[^>]*>/g.test(previewContent);
+                            
+                            if (isHTML) {
+                              return (
+                                <div 
+                                  className="break-words email-content-preview"
+                                  dangerouslySetInnerHTML={{ __html: previewContent }}
+                                />
+                              );
+                            } else {
+                              return (
+                                <div className="break-words whitespace-pre-wrap">
+                                  {previewContent}
+                                </div>
+                              );
+                            }
+                          })()}
                         </div>
                       </div>
                     ) : null;
@@ -901,13 +942,12 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                 </div>
 
                 {/* Email Content */}
-                <div className="prose prose-sm max-w-none overflow-hidden">
+                <div className="max-w-none overflow-hidden">
                   {(() => {
                     if (formData.templateId && templates) {
                       const template = templates.find(t => t._id === formData.templateId);
                       if (template) {
                         // Replace template variables with sample data for preview
-                        let content = template.content;
                         const sampleData: Record<string, string> = {
                           name: 'John Doe',
                           email: 'sample@example.com',
@@ -917,16 +957,45 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                           date: new Date().toLocaleDateString()
                         };
                         
+                        // Use HTML content if available, fallback to plain content
+                        let content = template.htmlContent || template.content;
+                        
                         template.variables?.forEach(variable => {
                           const replacement = sampleData[variable] || `{${variable}}`;
                           content = content.replace(new RegExp(`{${variable}}`, 'g'), replacement);
                         });
                         
-                        return (
-                          <div className="whitespace-pre-wrap text-gray-900 break-words max-h-96 overflow-y-auto">
-                            {content}
-                          </div>
-                        );
+                        // Check if content contains HTML tags
+                        const isHTML = /<[^>]*>/g.test(content);
+                        
+                        if (isHTML) {
+                          return (
+                            <div 
+                              className="max-h-96 overflow-y-auto email-content-preview"
+                              dangerouslySetInnerHTML={{ __html: content }}
+                              style={{ 
+                                backgroundColor: '#ffffff',
+                                padding: '1rem',
+                                borderRadius: '0.375rem',
+                                border: '1px solid #e5e7eb'
+                              }}
+                            />
+                          );
+                        } else {
+                          return (
+                            <div 
+                              className="whitespace-pre-wrap text-gray-900 break-words max-h-96 overflow-y-auto"
+                              style={{ 
+                                backgroundColor: '#ffffff',
+                                padding: '1rem',
+                                borderRadius: '0.375rem',
+                                border: '1px solid #e5e7eb'
+                              }}
+                            >
+                              {content}
+                            </div>
+                          );
+                        }
                       }
                     }
                     
@@ -945,11 +1014,37 @@ export function CampaignForm({ campaignId, onSuccess }: CampaignFormProps) {
                         content = content.replace(new RegExp(`{${key}}`, 'g'), value);
                       });
                       
-                      return (
-                        <div className="whitespace-pre-wrap text-gray-900 break-words max-h-96 overflow-y-auto">
-                          {content}
-                        </div>
-                      );
+                      // Check if content contains HTML tags
+                      const isHTML = /<[^>]*>/g.test(content);
+                      
+                      if (isHTML) {
+                        return (
+                          <div 
+                            className="max-h-96 overflow-y-auto email-content-preview"
+                            dangerouslySetInnerHTML={{ __html: content }}
+                            style={{ 
+                              backgroundColor: '#ffffff',
+                              padding: '1rem',
+                              borderRadius: '0.375rem',
+                              border: '1px solid #e5e7eb'
+                            }}
+                          />
+                        );
+                      } else {
+                        return (
+                          <div 
+                            className="whitespace-pre-wrap text-gray-900 break-words max-h-96 overflow-y-auto"
+                            style={{ 
+                              backgroundColor: '#ffffff',
+                              padding: '1rem',
+                              borderRadius: '0.375rem',
+                              border: '1px solid #e5e7eb'
+                            }}
+                          >
+                            {content}
+                          </div>
+                        );
+                      }
                     }
                     
                     return (
