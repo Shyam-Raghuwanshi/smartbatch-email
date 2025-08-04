@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useQuery } from 'convex/react';
+import { useUser } from '@clerk/nextjs';
+import { useCurrentUser } from '@/lib/convex-hooks';
 import { api } from '@/convex/_generated/api';
 import { 
   Home,
@@ -68,7 +70,17 @@ interface SidebarProps {
 // Desktop Sidebar Component
 function DesktopSidebar({ className }: { className?: string }) {
   const pathname = usePathname();
-  const campaigns = useQuery(api.campaigns.getUserCampaigns) || [];
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
+  const convexUser = useCurrentUser();
+  
+  // Only fetch data if user is properly authenticated and synced
+  const isUserReady = clerkLoaded && clerkUser && convexUser;
+  
+  const campaigns = useQuery(
+    api.campaigns.getUserCampaigns,
+    isUserReady ? {} : "skip"
+  ) || [];
+  
   const navigation = createNavigation(campaigns.length);
 
   return (
@@ -157,7 +169,17 @@ function DesktopSidebar({ className }: { className?: string }) {
 // Mobile Sidebar Component
 function MobileSidebar() {
   const pathname = usePathname();
-  const campaigns = useQuery(api.campaigns.getUserCampaigns) || [];
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
+  const convexUser = useCurrentUser();
+  
+  // Only fetch data if user is properly authenticated and synced
+  const isUserReady = clerkLoaded && clerkUser && convexUser;
+  
+  const campaigns = useQuery(
+    api.campaigns.getUserCampaigns,
+    isUserReady ? {} : "skip"
+  ) || [];
+  
   const navigation = createNavigation(campaigns.length);
 
   return (

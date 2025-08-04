@@ -1,38 +1,76 @@
 "use client";
 
+import { useUser } from '@clerk/nextjs'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
-import { useUserSync } from '@/hooks/useUserSync'
+import { useCurrentUser, useEnsureUser } from '@/lib/convex-hooks'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { AlertTriangle, CheckCircle, Mail, Users, BarChart3, Target, Loader2 } from 'lucide-react'
 
 export default function DashboardPage() {
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser()
+  const convexUser = useCurrentUser()
+  const ensureUser = useEnsureUser()
   const router = useRouter()
-  const { isLoading, isError, error, user, isAuthenticated } = useUserSync()
+  const [userSyncAttempted, setUserSyncAttempted] = useState(false)
+  const [isUserSyncing, setIsUserSyncing] = useState(false)
 
-  // Get user's email usage data - only fetch if user exists
+  // Only consider user ready when both Clerk is loaded and we have a Convex user
+  const isUserReady = clerkLoaded && clerkUser && convexUser && !isUserSyncing
+
+  // Get user's email usage data - only fetch if user exists and is properly synced
   const monthlyUsage = useQuery(
     api.userEmailUsage.getMonthlyEmailUsage,
-    isAuthenticated ? {} : "skip"
+    isUserReady ? {} : "skip"
   )
   const dashboardData = useQuery(
     api.emailDashboard.getDashboardData,
-    isAuthenticated ? { timeRange: "30d" } : "skip"
+    isUserReady ? { timeRange: "30d" } : "skip"
   )
   const campaigns = useQuery(
     api.campaigns.getUserCampaigns,
-    isAuthenticated ? {} : "skip"
+    isUserReady ? {} : "skip"
   )
   const contacts = useQuery(
     api.contacts.getUserContacts,
-    isAuthenticated ? { page: 0, limit: 1 } : "skip"
-  ) // Just to get count
+    isUserReady ? { page: 0, limit: 50 } : "skip"
+  )
+
+  // Sync Clerk user with Convex database
+  useEffect(() => {
+    async function syncUserData() {
+      if (clerkLoaded && clerkUser && !convexUser && !userSyncAttempted && !isUserSyncing) {
+        setUserSyncAttempted(true)
+        setIsUserSyncing(true)
+        
+        try {
+          await ensureUser({
+            email: clerkUser.emailAddresses[0]?.emailAddress || '',
+            name: clerkUser.fullName || clerkUser.emailAddresses[0]?.emailAddress || '',
+          })
+          
+          // Wait for the user to be properly created in the database
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          
+        } catch (error) {
+          console.error('Failed to sync user:', error)
+          // Reset flags to allow retry
+          setUserSyncAttempted(false)
+        } finally {
+          setIsUserSyncing(false)
+        }
+      }
+    }
+
+    syncUserData()
+  }, [clerkLoaded, clerkUser, convexUser, ensureUser, userSyncAttempted, isUserSyncing])
 
   // Show loading state while authentication is settling
-  if (isLoading) {
+  if (!clerkLoaded || (clerkUser && (!convexUser || isUserSyncing))) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -42,11 +80,6 @@ export default function DashboardPage() {
         </div>
       </div>
     )
-  }
-
-  // Show error state if sync failed
-  if (isError && error) {
-    throw error; // Let the error boundary handle it
   }
 
   // Calculate stats from actual data
@@ -60,22 +93,22 @@ export default function DashboardPage() {
     },
     { 
       name: 'Active Contacts', 
-      value: contacts?.total?.toLocaleString() || '0', 
-      change: contacts?.total ? `${contacts.total} total contacts` : 'Import your first contacts', 
+      value: contacts?.page?.length?.toString() || '0', 
+      change: contacts?.page?.length ? `${contacts.page.length} contacts loaded` : 'Import your first contacts', 
       icon: <Users className="h-5 w-5" />,
       color: 'green'
     },
     { 
       name: 'Email Opens', 
-      value: dashboardData?.openRate ? `${Math.round(dashboardData.openRate)}%` : '0%', 
-      change: dashboardData?.totalEmailsSent ? `${dashboardData.totalEmailsSent} emails sent` : 'No emails sent yet', 
+      value: dashboardData?.emailStats?.openRate ? `${Math.round(dashboardData.emailStats.openRate)}%` : '0%', 
+      change: dashboardData?.emailStats?.totalSent ? `${dashboardData.emailStats.totalSent} emails sent` : 'No emails sent yet', 
       icon: <BarChart3 className="h-5 w-5" />,
       color: 'purple'
     },
     { 
       name: 'Click Rate', 
-      value: dashboardData?.clickRate ? `${Math.round(dashboardData.clickRate)}%` : '0%', 
-      change: dashboardData?.totalClicks ? `${dashboardData.totalClicks} total clicks` : 'No clicks yet', 
+      value: dashboardData?.emailStats?.clickRate ? `${Math.round(dashboardData.emailStats.clickRate)}%` : '0%', 
+      change: dashboardData?.emailStats?.totalClicks ? `${dashboardData.emailStats.totalClicks} total clicks` : 'No clicks yet', 
       icon: <Target className="h-5 w-5" />,
       color: 'orange'
     },
@@ -149,12 +182,12 @@ export default function DashboardPage() {
                 <span className="text-gray-600">No recent activity - create your first campaign to get started!</span>
               </div>
             )}
-            {contacts?.total && contacts.total > 0 && (
+            {contacts?.page && contacts.page.length > 0 && (
               <div className="flex items-center text-sm">
                 <div className="text-purple-500 mr-3">
                   <Users className="h-4 w-4" />
                 </div>
-                <span className="text-gray-600">{contacts.total} contacts in your database</span>
+                <span className="text-gray-600">{contacts.page.length} contacts in your database</span>
                 <span className="ml-auto text-gray-400">Updated recently</span>
               </div>
             )}

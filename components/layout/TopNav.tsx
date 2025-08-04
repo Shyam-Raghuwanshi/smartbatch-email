@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { UserButton } from '@clerk/nextjs';
+import { UserButton, useUser } from '@clerk/nextjs';
 import { Bell, Search, X, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,32 +15,50 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { useCurrentUser } from '@/lib/convex-hooks';
 
 interface TopNavProps {
   title?: string;
 }
 
 export default function TopNav({ title = "Dashboard" }: TopNavProps) {
-  // Get real notifications from Convex
-  const notifications = useQuery(api.notifications.getUserNotifications, { limit: 20 });
-  const unreadCount = useQuery(api.notifications.getUnreadCount);
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
+  const convexUser = useCurrentUser();
+  
+  // Only fetch data if user is properly authenticated and synced
+  const isUserReady = clerkLoaded && clerkUser && convexUser;
+  
+  // Get real notifications from Convex - only if user is ready
+  const notifications = useQuery(
+    api.notifications.getUserNotifications, 
+    isUserReady ? { limit: 20 } : "skip"
+  );
+  const unreadCount = useQuery(
+    api.notifications.getUnreadCount,
+    isUserReady ? {} : "skip"
+  );
   const markAsRead = useMutation(api.notifications.markAsRead);
   const markAllAsRead = useMutation(api.notifications.markAllAsRead);
   const deleteNotification = useMutation(api.notifications.deleteNotification);
   const deleteAllNotifications = useMutation(api.notifications.deleteAllNotifications);
   const initializeNotifications = useMutation(api.users.initializeUserNotifications);
 
-  // Initialize sample notifications for new users
+  // Initialize sample notifications for new users - only when user is ready
   React.useEffect(() => {
+    if (!isUserReady) return;
+    
     const init = async () => {
       try {
         await initializeNotifications();
       } catch (error) {
-        // Ignore errors - user might not be authenticated yet
+        console.log('Failed to initialize notifications:', error);
       }
     };
-    init();
-  }, [initializeNotifications]);
+    
+    // Small delay to ensure user is fully synced
+    const timeoutId = setTimeout(init, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [initializeNotifications, isUserReady]);
 
   const getNotificationIcon = (type: string) => {
     switch (type) {

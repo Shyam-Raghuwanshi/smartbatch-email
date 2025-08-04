@@ -82,7 +82,7 @@ export default function Home() {
           <div className="mt-10 flex justify-center space-x-6">
             <SignUpButton mode="modal">
               <button className="bg-blue-600 hover:bg-blue-700 text-white text-lg font-medium py-3 px-8 rounded-lg shadow-lg transition-colors">
-                Start Free Trial
+                Start For Free
               </button>
             </SignUpButton>
             <SignInButton mode="modal">

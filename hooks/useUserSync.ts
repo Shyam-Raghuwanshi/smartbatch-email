@@ -65,6 +65,9 @@ export function useUserSync(): UserSyncState {
             name: clerkUser.fullName || clerkUser.emailAddresses[0]?.emailAddress || '',
           });
           
+          // Wait a bit for the user to be properly created before marking as complete
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
           setSyncState({
             isLoading: false,
             isError: false,
