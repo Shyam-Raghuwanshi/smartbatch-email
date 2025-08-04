@@ -3,18 +3,45 @@
 import { SignInButton, SignUpButton, useUser } from '@clerk/nextjs'
 import Link from 'next/link'
 import { useEffect } from 'react'
-import { redirect } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { Logo } from '@/components/ui/logo'
 
 export default function Home() {
-  const { isSignedIn, user } = useUser()
+  const { isSignedIn, isLoaded } = useUser()
+  const router = useRouter()
 
   // Redirect to dashboard if user is already signed in
   useEffect(() => {
-    if (isSignedIn) {
-      redirect('/dashboard')
+    if (isLoaded && isSignedIn) {
+      router.replace('/dashboard')
     }
-  }, [isSignedIn])
+  }, [isSignedIn, isLoaded, router])
+
+  // Show loading state while checking authentication
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <Logo size="xl" />
+          <div className="mt-4 animate-pulse">
+            <div className="h-2 bg-blue-200 rounded w-32 mx-auto"></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Don't render content if user is signed in (will redirect)
+  if (isSignedIn) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <Logo size="xl" />
+          <p className="mt-4 text-gray-600">Redirecting to dashboard...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">

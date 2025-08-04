@@ -23,6 +23,7 @@ export function EmailSetupPrompt() {
   const [hasChecked, setHasChecked] = useState(false);
 
   // Only check if user is authenticated and Clerk is loaded
+  // Also wait a bit for the user sync to complete
   const hasEmailSettings = useQuery(
     api.emailSettings.hasEmailSettings,
     isLoaded && isSignedIn ? {} : "skip"
@@ -35,8 +36,8 @@ export function EmailSetupPrompt() {
       
       // If user doesn't have email settings, show the setup prompt
       if (!hasEmailSettings) {
-        // Small delay to ensure the app has loaded
-        setTimeout(() => setIsOpen(true), 1000);
+        // Longer delay to ensure the dashboard has loaded and user sync is complete
+        setTimeout(() => setIsOpen(true), 2000);
       }
     }
   }, [isLoaded, isSignedIn, hasEmailSettings, hasChecked]);

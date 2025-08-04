@@ -44,34 +44,39 @@ export const ensureUser = mutation({
       throw new Error("Not authenticated");
     }
 
-    // Check if user already exists
-    const existingUser = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+    try {
+      // Check if user already exists
+      const existingUser = await ctx.db
+        .query("users")
+        .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+        .unique();
 
-    if (existingUser) {
-      // Update user info if needed
-      if (existingUser.email !== args.email || existingUser.name !== args.name) {
-        await ctx.db.patch(existingUser._id, {
-          email: args.email,
-          name: args.name,
-        });
+      if (existingUser) {
+        // Update user info if needed
+        if (existingUser.email !== args.email || existingUser.name !== args.name) {
+          await ctx.db.patch(existingUser._id, {
+            email: args.email,
+            name: args.name,
+          });
+        }
+        return existingUser._id;
       }
-      return existingUser._id;
-    }
 
-    // Create new user
-    return await ctx.db.insert("users", {
-      clerkId: identity.subject,
-      email: args.email,
-      name: args.name,
-      createdAt: Date.now(),
-      subscription: {
-        plan: "free",
-        status: "active",
-      },
-    });
+      // Create new user
+      return await ctx.db.insert("users", {
+        clerkId: identity.subject,
+        email: args.email,
+        name: args.name,
+        createdAt: Date.now(),
+        subscription: {
+          plan: "free",
+          status: "active",
+        },
+      });
+    } catch (error) {
+      console.error("Error in ensureUser:", error);
+      throw new Error(`Failed to sync user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   },
 });
 

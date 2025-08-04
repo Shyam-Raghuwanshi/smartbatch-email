@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar';
 import TopNav from './TopNav';
 import { EmailSetupPrompt } from '@/components/email-setup-prompt';
+import { AuthErrorBoundary } from '@/components/auth-error-boundary';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -28,25 +29,27 @@ export default function DashboardLayout({ children, title }: DashboardLayoutProp
   };
 
   return (
-    <div className="h-full">
-      {/* Email Setup Prompt */}
-      <EmailSetupPrompt />
-      
-      {/* Sidebar */}
-      <Sidebar />
+    <AuthErrorBoundary>
+      <div className="h-full">
+        {/* Email Setup Prompt */}
+        <EmailSetupPrompt />
+        
+        {/* Sidebar */}
+        <Sidebar />
 
-      {/* Main content area */}
-      <div className="lg:pl-72">
-        {/* Top navigation */}
-        <TopNav title={getPageTitle()} />
+        {/* Main content area */}
+        <div className="lg:pl-72">
+          {/* Top navigation */}
+          <TopNav title={getPageTitle()} />
 
-        {/* Page content */}
-        <main className="py-10">
-          <div className="px-4 sm:px-6 lg:px-8">
-            {children}
-          </div>
-        </main>
+          {/* Page content */}
+          <main className="py-10">
+            <div className="px-4 sm:px-6 lg:px-8">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </AuthErrorBoundary>
   );
 }

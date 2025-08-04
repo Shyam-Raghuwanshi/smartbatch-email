@@ -1,65 +1,81 @@
 "use client";
 
-import { useUser } from '@clerk/nextjs'
-import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
-import { useCurrentUser, useEnsureUser } from '@/lib/convex-hooks'
+import { useUserSync } from '@/hooks/useUserSync'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
-import { AlertTriangle, CheckCircle, Mail, Users, BarChart3, Target } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Mail, Users, BarChart3, Target, Loader2 } from 'lucide-react'
 
 export default function DashboardPage() {
-  const { user: clerkUser } = useUser()
-  const convexUser = useCurrentUser()
-  const ensureUser = useEnsureUser()
   const router = useRouter()
+  const { isLoading, isError, error, user, isAuthenticated } = useUserSync()
 
-  // Get user's email usage data
-  const monthlyUsage = useQuery(api.userEmailUsage.getMonthlyEmailUsage)
-  const dashboardData = useQuery(api.emailDashboard.getDashboardData, { timeRange: "30d" })
-  const campaigns = useQuery(api.campaigns.getUserCampaigns)
-  const contacts = useQuery(api.contacts.getUserContacts, { page: 0, limit: 1 }) // Just to get count
+  // Get user's email usage data - only fetch if user exists
+  const monthlyUsage = useQuery(
+    api.userEmailUsage.getMonthlyEmailUsage,
+    isAuthenticated ? {} : "skip"
+  )
+  const dashboardData = useQuery(
+    api.emailDashboard.getDashboardData,
+    isAuthenticated ? { timeRange: "30d" } : "skip"
+  )
+  const campaigns = useQuery(
+    api.campaigns.getUserCampaigns,
+    isAuthenticated ? {} : "skip"
+  )
+  const contacts = useQuery(
+    api.contacts.getUserContacts,
+    isAuthenticated ? { page: 0, limit: 1 } : "skip"
+  ) // Just to get count
 
-  // Sync Clerk user with Convex database
-  useEffect(() => {
-    if (clerkUser && !convexUser) {
-      ensureUser({
-        email: clerkUser.emailAddresses[0]?.emailAddress || '',
-        name: clerkUser.fullName || clerkUser.emailAddresses[0]?.emailAddress || '',
-      })
-    }
-  }, [clerkUser, convexUser, ensureUser])
+  // Show loading state while authentication is settling
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Setting up your dashboard...</h2>
+          <p className="text-gray-600">This will only take a moment.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state if sync failed
+  if (isError && error) {
+    throw error; // Let the error boundary handle it
+  }
 
   // Calculate stats from actual data
   const stats = [
     { 
       name: 'Total Campaigns', 
       value: campaigns?.length.toString() || '0', 
-      change: '+2 from last month', 
+      change: campaigns && campaigns.length > 0 ? `${campaigns.length} active` : 'No campaigns yet', 
       icon: <Mail className="h-5 w-5" />,
       color: 'blue'
     },
     { 
       name: 'Active Contacts', 
       value: contacts?.total?.toLocaleString() || '0', 
-      change: '+12% from last month', 
+      change: contacts?.total ? `${contacts.total} total contacts` : 'Import your first contacts', 
       icon: <Users className="h-5 w-5" />,
       color: 'green'
     },
     { 
       name: 'Email Opens', 
-      value: '89%', 
-      change: '+2.1% from last month', 
+      value: dashboardData?.openRate ? `${Math.round(dashboardData.openRate)}%` : '0%', 
+      change: dashboardData?.totalEmailsSent ? `${dashboardData.totalEmailsSent} emails sent` : 'No emails sent yet', 
       icon: <BarChart3 className="h-5 w-5" />,
       color: 'purple'
     },
     { 
       name: 'Click Rate', 
-      value: '24%', 
-      change: '+1.8% from last month', 
+      value: dashboardData?.clickRate ? `${Math.round(dashboardData.clickRate)}%` : '0%', 
+      change: dashboardData?.totalClicks ? `${dashboardData.totalClicks} total clicks` : 'No clicks yet', 
       icon: <Target className="h-5 w-5" />,
       color: 'orange'
     },
@@ -111,27 +127,37 @@ export default function DashboardPage() {
         </div>
         <div className="p-6">
           <div className="space-y-4">
-            <div className="flex items-center text-sm">
-              <div className="text-green-500 mr-3">
-                <CheckCircle className="h-4 w-4" />
+            {campaigns && campaigns.length > 0 ? (
+              campaigns.slice(0, 3).map((campaign, index) => (
+                <div key={campaign._id} className="flex items-center text-sm">
+                  <div className="text-green-500 mr-3">
+                    <CheckCircle className="h-4 w-4" />
+                  </div>
+                  <span className="text-gray-600">
+                    Campaign &quot;{campaign.name}&quot; - {campaign.status}
+                  </span>
+                  <span className="ml-auto text-gray-400">
+                    {new Date(campaign._creationTime).toLocaleDateString()}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="flex items-center text-sm">
+                <div className="text-gray-400 mr-3">
+                  <Mail className="h-4 w-4" />
+                </div>
+                <span className="text-gray-600">No recent activity - create your first campaign to get started!</span>
               </div>
-              <span className="text-gray-600">Campaign &quot;Summer Sale&quot; sent to 500 contacts</span>
-              <span className="ml-auto text-gray-400">2 hours ago</span>
-            </div>
-            <div className="flex items-center text-sm">
-              <div className="text-blue-500 mr-3">
-                <Mail className="h-4 w-4" />
+            )}
+            {contacts?.total && contacts.total > 0 && (
+              <div className="flex items-center text-sm">
+                <div className="text-purple-500 mr-3">
+                  <Users className="h-4 w-4" />
+                </div>
+                <span className="text-gray-600">{contacts.total} contacts in your database</span>
+                <span className="ml-auto text-gray-400">Updated recently</span>
               </div>
-              <span className="text-gray-600">New template &quot;Welcome Series&quot; created</span>
-              <span className="ml-auto text-gray-400">1 day ago</span>
-            </div>
-            <div className="flex items-center text-sm">
-              <div className="text-purple-500 mr-3">
-                <Users className="h-4 w-4" />
-              </div>
-              <span className="text-gray-600">25 new contacts imported</span>
-              <span className="ml-auto text-gray-400">2 days ago</span>
-            </div>
+            )}
           </div>
         </div>
       </div>
