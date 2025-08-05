@@ -131,6 +131,9 @@ export function CampaignForm({ campaignId, onSuccess, initialTags = [] }: Campai
         return false;
     }
   };
+
+  // Check if email configuration is available
+  const hasEmailConfiguration = emailSettings && emailSettings.length > 0;
   
   const canProceedToNext = isStepValid(activeTab);
 
@@ -436,9 +439,9 @@ export function CampaignForm({ campaignId, onSuccess, initialTags = [] }: Campai
                       </SelectContent>
                     </Select>
                     {(!emailSettings || emailSettings.length === 0) && (
-                      <p className="text-sm text-amber-600 mt-1 flex items-center gap-1">
+                      <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
                         <AlertCircle className="h-3 w-3" />
-                        No custom email configurations found. 
+                        You will not be able to create a campaign. First setup this email service. 
                         <a href="/settings?tab=email" target="_blank" className="underline">
                           Set one up here
                         </a>
@@ -734,9 +737,9 @@ export function CampaignForm({ campaignId, onSuccess, initialTags = [] }: Campai
               <div>
                 <Label>Add Target Tags</Label>
                 <div className="flex flex-col sm:flex-row gap-2">
-                  <Select value={newTag} onValueChange={setNewTag}>
+                  <Select value={newTag} onValueChange={setNewTag} disabled={availableTags.length === 0}>
                     <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Select a tag..." />
+                      <SelectValue placeholder={availableTags.length === 0 ? "No tags available" : "Select a tag..."} />
                     </SelectTrigger>
                     <SelectContent>
                       {availableTags
@@ -748,11 +751,27 @@ export function CampaignForm({ campaignId, onSuccess, initialTags = [] }: Campai
                         ))}
                     </SelectContent>
                   </Select>
-                  <Button type="button" onClick={addTag} disabled={!newTag} className="sm:w-auto w-full">
+                  <Button type="button" onClick={addTag} disabled={!newTag || availableTags.length === 0} className="sm:w-auto w-full">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Tag
                   </Button>
                 </div>
+                {availableTags.length === 0 && (
+                  <Alert className="border-red-200 bg-red-50 mt-3">
+                    <AlertCircle className="h-4 w-4 text-red-600" />
+                    <AlertDescription className="text-red-700">
+                      No tags found! Please upload contact data with tags first. You can{' '}
+                      <a href="/contacts" target="_blank" className="underline font-medium hover:text-red-800">
+                        upload contacts here
+                      </a>{' '}
+                      or{' '}
+                      <a href="/contacts/import" target="_blank" className="underline font-medium hover:text-red-800">
+                        import from CSV
+                      </a>{' '}
+                      to get started.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
 
               <div>
@@ -1152,23 +1171,40 @@ export function CampaignForm({ campaignId, onSuccess, initialTags = [] }: Campai
             
             {/* Create/Update Button - Only show on last step */}
             {currentStepIndex === steps.length - 1 && (
-              <Button
-                type="submit"
-                disabled={isSubmitting || !formData.name || !formData.subject || formData.targetTags.length === 0}
-                className="min-w-[140px] w-full sm:w-auto"
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    {campaignId ? 'Updating...' : 'Creating...'}
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    {campaignId ? 'Update Campaign' : 'Create Campaign'}
-                  </>
+              <div className="flex flex-col gap-2 w-full sm:w-auto">
+                {!hasEmailConfiguration && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-red-800">
+                      <AlertCircle className="h-4 w-4" />
+                      <span className="text-sm font-medium">Email service required</span>
+                    </div>
+                    <p className="text-xs text-red-700 mt-1">
+                      Setup your email service in{" "}
+                      <a href="/settings?tab=email" target="_blank" className="underline">
+                        settings
+                      </a>{" "}
+                      to create campaigns.
+                    </p>
+                  </div>
                 )}
-              </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting || !formData.name || !formData.subject || formData.targetTags.length === 0 || !hasEmailConfiguration}
+                  className="min-w-[140px] w-full sm:w-auto"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      {campaignId ? 'Updating...' : 'Creating...'}
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      {campaignId ? 'Update Campaign' : 'Create Campaign'}
+                    </>
+                  )}
+                </Button>
+              </div>
             )}
           </div>
         </div>

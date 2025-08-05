@@ -120,6 +120,17 @@ export const createCampaign = mutation({
     })),
   },
   handler: async (ctx, args) => {
+    // Check if user has any email settings configured
+    const emailSettings = await ctx.db
+      .query("emailSettings")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    if (!emailSettings || emailSettings.length === 0) {
+      throw new Error("Email settings not configured. Please set up your email configuration in settings before creating campaigns.");
+    }
+
     const campaignId = await ctx.db.insert("campaigns", {
       ...args,
       createdAt: Date.now(),
@@ -675,6 +686,18 @@ export const queueCampaignEmails = internalMutation({
   },
   handler: async (ctx, args) => {
     console.log("📋 Starting to queue campaign emails for campaign:", args.campaignId);
+    
+    // Check if user has any email settings configured
+    const emailSettings = await ctx.db
+      .query("emailSettings")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    if (!emailSettings || emailSettings.length === 0) {
+      console.log("❌ No email settings configured for user:", args.userId);
+      throw new Error("Email settings not configured. Please set up your email configuration in settings before sending campaigns.");
+    }
     
     const campaign = await ctx.db.get(args.campaignId);
     if (!campaign || !campaign.settings) {
